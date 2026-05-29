@@ -18,11 +18,6 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, where, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
-
-// Import Firebase Provider
-import { auth, db, OperationType, handleFirestoreError } from './firebase';
 
 // Import Types
 import { Account, Trade, TradeAction, TradeSession, TradingPair, BalanceTransaction } from './types';
@@ -52,8 +47,11 @@ import ConfirmModal from './components/ConfirmModal';
 
 export default function App() {
   // --- AUTH STATE ---
-  const [currentUser, setCurrentUser] = useState<any | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any | null>(() => {
+    const saved = localStorage.getItem('tj_local_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
 
   // --- CORE DATA STATE ---
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -114,15 +112,6 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // --- AUTH LISTENERS AND FIRESTORE SYNC ---
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setIsAuthLoading(false);
-    });
-    return () => unsubscribeAuth();
-  }, []);
-
   // Theme observer
   useEffect(() => {
     localStorage.setItem('tj_theme', theme);
@@ -134,7 +123,7 @@ export default function App() {
     }
   }, [theme]);
 
-  // Firestore Snapshot listeners keyed to currentUser
+  // Sync core local storage states
   useEffect(() => {
     if (!currentUser) {
       setAccounts([]);
@@ -144,82 +133,27 @@ export default function App() {
       return;
     }
 
-    if (currentUser.isLocal) {
-      const storedAccountStr = localStorage.getItem('tj_local_accounts');
-      const storedTradeStr = localStorage.getItem('tj_local_trades');
-      const storedTxStr = localStorage.getItem('tj_local_tx');
+    const storedAccountStr = localStorage.getItem('tj_local_accounts');
+    const storedTradeStr = localStorage.getItem('tj_local_trades');
+    const storedTxStr = localStorage.getItem('tj_local_tx');
 
-      let localAccounts: Account[] = [];
-      let localTrades: Trade[] = [];
-      let localTx: BalanceTransaction[] = [];
+    let localAccounts: Account[] = [];
+    let localTrades: Trade[] = [];
+    let localTx: BalanceTransaction[] = [];
 
-      try { localAccounts = storedAccountStr ? JSON.parse(storedAccountStr) : []; } catch (e) { console.error(e); }
-      try { localTrades = storedTradeStr ? JSON.parse(storedTradeStr) : []; } catch (e) { console.error(e); }
-      try { localTx = storedTxStr ? JSON.parse(storedTxStr) : []; } catch (e) { console.error(e); }
+    try { localAccounts = storedAccountStr ? JSON.parse(storedAccountStr) : []; } catch (e) { console.error(e); }
+    try { localTrades = storedTradeStr ? JSON.parse(storedTradeStr) : []; } catch (e) { console.error(e); }
+    try { localTx = storedTxStr ? JSON.parse(storedTxStr) : []; } catch (e) { console.error(e); }
 
-      setAccounts(localAccounts);
-      setTrades(localTrades);
-      setBalanceTransactions(localTx);
+    setAccounts(localAccounts);
+    setTrades(localTrades);
+    setBalanceTransactions(localTx);
 
-      if (localAccounts.length > 0) {
-        setActiveAccountId(localAccounts[0].id);
-      } else {
-        setActiveAccountId('');
-      }
-      return;
+    if (localAccounts.length > 0) {
+      setActiveAccountId(localAccounts[0].id);
+    } else {
+      setActiveAccountId('');
     }
-
-    // 1. Listen to user accounts
-    const qAccounts = query(collection(db, 'accounts'), where('userId', '==', currentUser.uid));
-    const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
-      const list: Account[] = [];
-      snapshot.forEach(docSnap => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as Account);
-      });
-      setAccounts(list);
-      
-      // Select the first account if none is active
-      if (list.length > 0) {
-        setActiveAccountId(prev => {
-          if (prev && list.some(a => a.id === prev)) return prev;
-          return list[0].id;
-        });
-      } else {
-        setActiveAccountId('');
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'accounts');
-    });
-
-    // 2. Listen to user trades
-    const qTrades = query(collection(db, 'trades'), where('userId', '==', currentUser.uid));
-    const unsubTrades = onSnapshot(qTrades, (snapshot) => {
-      const list: Trade[] = [];
-      snapshot.forEach(docSnap => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as Trade);
-      });
-      setTrades(list);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'trades');
-    });
-
-    // 3. Listen to balance transactions
-    const qTx = query(collection(db, 'balance_transactions'), where('userId', '==', currentUser.uid));
-    const unsubTx = onSnapshot(qTx, (snapshot) => {
-      const list: BalanceTransaction[] = [];
-      snapshot.forEach(docSnap => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as BalanceTransaction);
-      });
-      setBalanceTransactions(list);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'balance_transactions');
-    });
-
-    return () => {
-      unsubAccounts();
-      unsubTrades();
-      unsubTx();
-    };
   }, [currentUser]);
 
   // --- PERSIST KUSTOM PAIRS (LOCAL ONLY OR STATIC IS PREFERABLE) ---
@@ -342,7 +276,7 @@ export default function App() {
     setIsAccountModalOpen(true);
   };
 
-  const handleSaveAccount = async (form: any) => {
+  const handleSaveAccount = (form: any) => {
     if (!currentUser) return;
     try {
       const id = editingAccount ? editingAccount.id : `acc-${Date.now()}`;
@@ -359,32 +293,20 @@ export default function App() {
         type: 'STANDARD',
       };
 
-      if (currentUser.isLocal) {
-        const updatedAccounts = editingAccount
-          ? accounts.map(a => a.id === id ? payload : a)
-          : [...accounts, payload];
-        setAccounts(updatedAccounts);
-        localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccounts));
-        showToast(editingAccount ? 'Informasi akun berhasil diubah!' : 'Akun trading baru telah didaftarkan lokal!', 'success');
-        setIsAccountModalOpen(false);
-        setEditingAccount(null);
-        
-        if (!activeAccountId || activeAccountId === '') {
-          setActiveAccountId(id);
-        }
-        return;
-      }
-
-      await setDoc(doc(db, 'accounts', id), payload);
-      showToast(editingAccount ? 'Informasi akun berhasil diubah!' : 'Akun trading baru telah didaftarkan cloud!', 'success');
+      const updatedAccounts = editingAccount
+        ? accounts.map(a => a.id === id ? payload : a)
+        : [...accounts, payload];
+      setAccounts(updatedAccounts);
+      localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccounts));
+      showToast(editingAccount ? 'Informasi akun berhasil diubah!' : 'Akun trading baru telah didaftarkan!', 'success');
       setIsAccountModalOpen(false);
       setEditingAccount(null);
       
-      if (!activeAccountId) {
+      if (!activeAccountId || activeAccountId === '') {
         setActiveAccountId(id);
       }
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'accounts');
+      showToast('Gagal menyimpan akun.', 'error');
     }
   };
 
@@ -396,46 +318,29 @@ export default function App() {
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Akun Jurnal',
-      message: `Yakin ingin menghapus permanen akun "${accToRemove.name}" beserta seluruh histori transaksi & riwayat dananya secara permanen? Tindakan ini tidak bisa dibatalkan.`,
+      message: `Yakin ingin menghapus secara permanen akun "${accToRemove.name}" beserta seluruh histori transaksi & riwayat dananya dari penyimpanan lokal? Tindakan ini tidak bisa dibatalkan.`,
       confirmText: 'Ya, Hapus Permanen',
       isDanger: true,
-      onConfirm: async () => {
+      onConfirm: () => {
         try {
-          if (currentUser.isLocal) {
-            const updatedAccs = accounts.filter(a => a.id !== id);
-            const updatedTrades = trades.filter(t => t.accountId !== id);
-            const updatedTx = balanceTransactions.filter(tx => tx.accountId !== id);
+          const updatedAccs = accounts.filter(a => a.id !== id);
+          const updatedTrades = trades.filter(t => t.accountId !== id);
+          const updatedTx = balanceTransactions.filter(tx => tx.accountId !== id);
 
-            setAccounts(updatedAccs);
-            setTrades(updatedTrades);
-            setBalanceTransactions(updatedTx);
+          setAccounts(updatedAccs);
+          setTrades(updatedTrades);
+          setBalanceTransactions(updatedTx);
 
-            localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccs));
-            localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
-            localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
-
-            showToast(`Akun "${accToRemove.name}" beserta datanya berhasil dihapus.`, 'info');
-            if (activeAccountId === id) {
-              setActiveAccountId(updatedAccs[0]?.id || '');
-            }
-            return;
-          }
-
-          const relatedTrades = trades.filter(t => t.accountId === id);
-          const relatedTx = balanceTransactions.filter(tx => tx.accountId === id);
-
-          await Promise.all([
-            deleteDoc(doc(db, 'accounts', id)),
-            ...relatedTrades.map(t => deleteDoc(doc(db, 'trades', t.id))),
-            ...relatedTx.map(tx => deleteDoc(doc(db, 'balance_transactions', tx.id)))
-          ]);
+          localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccs));
+          localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
+          localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
 
           showToast(`Akun "${accToRemove.name}" beserta datanya berhasil dihapus.`, 'info');
           if (activeAccountId === id) {
-            setActiveAccountId('');
+            setActiveAccountId(updatedAccs[0]?.id || '');
           }
         } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, `accounts/${id}`);
+          showToast('Gagal menghapus akun.', 'error');
         }
       }
     });
@@ -450,7 +355,7 @@ export default function App() {
     setIsTradeModalOpen(true);
   };
 
-  const handleSaveTrade = async (form: any) => {
+  const handleSaveTrade = (form: any) => {
     if (!currentUser || !activeAccount) return;
     try {
       const id = editingTrade ? editingTrade.id : `trade-${Date.now()}`;
@@ -475,24 +380,16 @@ export default function App() {
         rMultiple: form.rMultiple
       };
 
-      if (currentUser.isLocal) {
-        const updatedTrades = editingTrade
-          ? trades.map(t => t.id === id ? payload : t)
-          : [...trades, payload];
-        setTrades(updatedTrades);
-        localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
-        showToast(editingTrade ? 'Transaksi berhasil diperbarui!' : 'Transaksi baru berhasil disimpan di jurnal lokal!', 'success');
-        setIsTradeModalOpen(false);
-        setEditingTrade(null);
-        return;
-      }
-
-      await setDoc(doc(db, 'trades', id), payload);
+      const updatedTrades = editingTrade
+        ? trades.map(t => t.id === id ? payload : t)
+        : [...trades, payload];
+      setTrades(updatedTrades);
+      localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
       showToast(editingTrade ? 'Transaksi berhasil diperbarui!' : 'Transaksi baru berhasil disimpan di jurnal!', 'success');
       setIsTradeModalOpen(false);
       setEditingTrade(null);
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'trades');
+      showToast('Gagal menyimpan transaksi.', 'error');
     }
   };
 
@@ -504,26 +401,20 @@ export default function App() {
       message: 'Hapus transaksi ini dari jurnal Anda secara permanen?',
       confirmText: 'Ya, Hapus',
       isDanger: true,
-      onConfirm: async () => {
+      onConfirm: () => {
         try {
-          if (currentUser.isLocal) {
-            const updatedTrades = trades.filter(t => t.id !== id);
-            setTrades(updatedTrades);
-            localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
-            showToast('Transaksi berhasil dihapus dari jurnal lokal.', 'info');
-            return;
-          }
-
-          await deleteDoc(doc(db, 'trades', id));
+          const updatedTrades = trades.filter(t => t.id !== id);
+          setTrades(updatedTrades);
+          localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
           showToast('Transaksi berhasil dihapus dari jurnal.', 'info');
         } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, `trades/${id}`);
+          showToast('Gagal menghapus transaksi.', 'error');
         }
       }
     });
   };
 
-  const handleAddBalanceTransaction = async (type: 'DEPOSIT' | 'WITHDRAWAL', amount: number, notes: string) => {
+  const handleAddBalanceTransaction = (type: 'DEPOSIT' | 'WITHDRAWAL', amount: number, notes: string) => {
     if (!currentUser || !activeAccount) return;
     try {
       const id = `tx-${Date.now()}`;
@@ -537,18 +428,12 @@ export default function App() {
         notes: notes.trim() || (type === 'DEPOSIT' ? 'Deposit saldo' : 'Withdraw saldo')
       };
 
-      if (currentUser.isLocal) {
-        const updatedTx = [...balanceTransactions, payload];
-        setBalanceTransactions(updatedTx);
-        localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
-        showToast('Transaksi mutasi saldo berhasil disimpan lokal!', 'success');
-        return;
-      }
-
-      await setDoc(doc(db, 'balance_transactions', id), payload);
+      const updatedTx = [...balanceTransactions, payload];
+      setBalanceTransactions(updatedTx);
+      localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
       showToast('Transaksi mutasi saldo berhasil disimpan!', 'success');
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'balance_transactions');
+      showToast('Gagal mutasi saldo.', 'error');
     }
   };
 
@@ -560,20 +445,14 @@ export default function App() {
       message: 'Batal mutasi transaksi ini? Saldo Anda akan disesuaikan secara otomatis.',
       confirmText: 'Ya, Batalkan',
       isDanger: true,
-      onConfirm: async () => {
+      onConfirm: () => {
         try {
-          if (currentUser.isLocal) {
-            const updatedTx = balanceTransactions.filter(tx => tx.id !== id);
-            setBalanceTransactions(updatedTx);
-            localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
-            showToast('Transaksi mutasi berhasil dibatalkan dari lokal.', 'info');
-            return;
-          }
-
-          await deleteDoc(doc(db, 'balance_transactions', id));
+          const updatedTx = balanceTransactions.filter(tx => tx.id !== id);
+          setBalanceTransactions(updatedTx);
+          localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
           showToast('Transaksi mutasi berhasil dibatalkan.', 'info');
         } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, `balance_transactions/${id}`);
+          showToast('Gagal membatalkan mutasi.', 'error');
         }
       }
     });
@@ -584,52 +463,31 @@ export default function App() {
     setConfirmModal({
       isOpen: true,
       title: 'Reset Seluruh Jurnal',
-      message: 'Apakah Anda yakin ingin menghapus seluruh data jurnal, transaksi, & akun Anda secara permanen? Data yang dihapus tidak dapat dipulihkan kembali.',
+      message: 'Apakah Anda yakin ingin menghapus seluruh data jurnal, transaksi, & akun Anda secara permanen? Data yang di-reset tidak dapat dipulihkan kembali.',
       confirmText: 'Ya, Reset Semua',
       isDanger: true,
-      onConfirm: async () => {
+      onConfirm: () => {
         try {
-          if (currentUser.isLocal) {
-            setAccounts([]);
-            setTrades([]);
-            setBalanceTransactions([]);
-            localStorage.removeItem('tj_local_accounts');
-            localStorage.removeItem('tj_local_trades');
-            localStorage.removeItem('tj_local_tx');
-            showToast('Seluruh data lokal berhasil dibersihkan.', 'info');
-            setActiveAccountId('');
-            return;
-          }
-
-          const accsToDelete = [...accounts];
-          const tradesToDelete = [...trades];
-          const txsToDelete = [...balanceTransactions];
-
-          // Perform parallel deletions to prevent state array indexing Shifts mid-loop
-          await Promise.all([
-            ...accsToDelete.map(acc => deleteDoc(doc(db, 'accounts', acc.id))),
-            ...tradesToDelete.map(t => deleteDoc(doc(db, 'trades', t.id))),
-            ...txsToDelete.map(tx => deleteDoc(doc(db, 'balance_transactions', tx.id)))
-          ]);
-
-          showToast('Seluruh data cloud berhasil dibersihkan.', 'info');
+          setAccounts([]);
+          setTrades([]);
+          setBalanceTransactions([]);
+          localStorage.removeItem('tj_local_accounts');
+          localStorage.removeItem('tj_local_trades');
+          localStorage.removeItem('tj_local_tx');
+          showToast('Seluruh data lokal berhasil dibersihkan.', 'info');
           setActiveAccountId('');
         } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, 'bulk_clear');
+          showToast('Gagal membersihkan data.', 'error');
         }
       }
     });
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     try {
-      if (currentUser.isLocal) {
-        setCurrentUser(null);
-        showToast('Anda berhasil keluar dari sesi lokal.', 'info');
-        return;
-      }
-      await signOut(auth);
-      showToast('Anda berhasil keluar dari sesi.', 'info');
+      localStorage.removeItem('tj_local_user');
+      setCurrentUser(null);
+      showToast('Anda berhasil keluar dari sesi lokal.', 'info');
     } catch (err) {
       console.error(err);
       showToast('Gagal keluar sesi.', 'error');

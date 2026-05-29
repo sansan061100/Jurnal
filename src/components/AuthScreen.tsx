@@ -3,79 +3,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { KeyRound, Sparkles, TrendingUp } from 'lucide-react';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+import { TrendingUp, Sparkles, User, Wallet, MonitorCheck } from 'lucide-react';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: any) => void;
   showToast: (msg: string, type?: 'success' | 'info' | 'error') => void;
 }
 
+const AVATAR_OPTIONS = ['📊', '💻', '📈', '⚡', '🐉', '🦉', '🦁', '🦊', '🚀', '🧠'];
+
 export default function AuthScreen({ onAuthSuccess, showToast }: AuthScreenProps) {
-  const [isEmailMode, setIsEmailMode] = React.useState(false);
-  const [isRegister, setIsRegister] = React.useState(false);
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
+  const [traderName, setTraderName] = useState(() => {
+    return localStorage.getItem('tj_pending_name') || '';
+  });
+  const [selectedAvatar, setSelectedAvatar] = useState('📊');
+  const [currency, setCurrency] = useState('IDR');
+  const [loading, setLoading] = useState(false);
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
-        showToast(`Selamat datang kembali, ${result.user.displayName || 'Trader'}!`, 'success');
-        onAuthSuccess(result.user);
-      }
-    } catch (err: any) {
-      console.error(err);
-      if (err.message?.includes('popup-blocked')) {
-        showToast('Popup login diblokir! Perbolehkan popup di browser Anda.', 'error');
-      } else {
-        showToast('Gagal menghubungkan ke akun Google.', 'error');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const handleCreateProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      showToast('Harap isi semua kolom email dan password!', 'error');
+    if (!traderName.trim()) {
+      showToast('Harap masukkan nama trader Anda!', 'error');
       return;
     }
+
     setLoading(true);
-    try {
-      if (isRegister) {
-        const result = await createUserWithEmailAndPassword(auth, email, password);
-        showToast('Pendaftaran berhasil! Akun Anda telah aktif.', 'success');
-        onAuthSuccess(result.user);
-      } else {
-        const result = await signInWithEmailAndPassword(auth, email, password);
-        showToast('Login berhasil! Memuat dasbor jurnal...', 'success');
-        onAuthSuccess(result.user);
-      }
-    } catch (err: any) {
-      console.error(err);
-      let errMsg = 'Terjadi kesalahan autentikasi.';
-      if (err.code === 'auth/email-already-in-use') {
-        errMsg = 'Email sudah terdaftar! Silakan login.';
-      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        errMsg = 'Email atau password salah!';
-      } else if (err.code === 'auth/invalid-email') {
-        errMsg = 'Format email tidak valid!';
-      } else if (err.code === 'auth/weak-password') {
-        errMsg = 'Password minimal terdiri dari 6 karakter!';
-      } else if (err.code === 'auth/operation-not-allowed') {
-        errMsg = 'Login Email/Sandi belum diaktifkan di konsol Firebase. Gunakan Google Sign-In!';
-      }
-      showToast(errMsg, 'error');
-    } finally {
+    setTimeout(() => {
+      const localUser = {
+        uid: 'local-trader-id',
+        displayName: traderName.trim(),
+        avatar: selectedAvatar,
+        currency: currency,
+        isLocal: true,
+      };
+      
+      localStorage.setItem('tj_local_user', JSON.stringify(localUser));
+      showToast(`Selamat datang ${traderName.trim()}! Memulai jurnal lokal PWA...`, 'success');
+      onAuthSuccess(localUser);
       setLoading(false);
-    }
+    }, 450);
   };
 
   return (
@@ -101,114 +69,84 @@ export default function AuthScreen({ onAuthSuccess, showToast }: AuthScreenProps
             <Sparkles className="h-4 w-4 text-cat-yellow shrink-0 animate-pulse" />
           </h1>
           <p className="text-[10px] text-cat-subtext uppercase tracking-widest font-bold mt-1.5">
-            PRO-GRADE PERFORMANCE MONITORING
+            100% OFFLINE & PRIVATE PWA
           </p>
         </div>
 
-        {/* Dynamic Auth Forms */}
-        {isEmailMode ? (
-          <form onSubmit={handleEmailAuth} className="space-y-3.5">
-            <div>
-              <label className="block text-[9px] font-black text-cat-overlay2 uppercase tracking-wider mb-1">
-                Alamat Email
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="Ex: trader@smc.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full bg-cat-base border border-cat-surface0 focus:border-cat-peach text-cat-text text-xs p-3.5 rounded-xl focus:outline-none placeholder:text-cat-surface2 font-medium"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[9px] font-black text-cat-overlay2 uppercase tracking-wider mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="Password minimal 6 karakter"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full bg-cat-base border border-cat-surface0 focus:border-cat-peach text-cat-text text-xs p-3.5 rounded-xl focus:outline-none placeholder:text-cat-surface2 font-mono font-bold"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-cat-peach hover:bg-cat-yellow text-cat-crust text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 select-none animate-none"
-            >
-              {loading ? 'Processing...' : (isRegister ? 'BUAT AKUN BARU' : 'MASUK KE DASBOR')}
-            </button>
-
-            <div className="flex justify-between items-center text-[10px] text-cat-subtext font-bold pt-1.5">
-              <button
-                type="button"
-                onClick={() => setIsRegister(prev => !prev)}
-                className="hover:text-cat-text transition focus:outline-none cursor-pointer"
-              >
-                {isRegister ? 'Sudah punya akun? Login' : 'Belum punya akun? Register'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEmailMode(false)}
-                className="text-cat-lavender hover:text-cat-pink transition focus:outline-none cursor-pointer"
-              >
-                Kembali
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-3">
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="w-full py-3 bg-cat-base hover:bg-cat-surface0 text-cat-text border border-cat-surface0 hover:border-cat-surface1 text-xs font-black uppercase tracking-wider rounded-xl shadow-sm transition flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 select-none"
-            >
-              <span className="text-sm shrink-0">🔑</span>
-              <span>{loading ? 'Menghubungkan...' : 'Login dengan Google'}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsEmailMode(true);
-                setIsRegister(false);
-              }}
-              className="w-full py-3 bg-cat-mantle text-cat-subtext hover:text-cat-text text-[10px] font-bold uppercase tracking-widest rounded-xl border border-cat-surface0/30 hover:border-cat-surface0 transition flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              Atau gunakan Email & Sandi
-            </button>
-
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-cat-surface0/20"></div>
-              <span className="flex-shrink mx-3 text-[9px] text-cat-overlay0 font-bold uppercase tracking-widest">Atau Tanpa Config</span>
-              <div className="flex-grow border-t border-cat-surface0/20"></div>
-            </div>
-
-            <button
-              onClick={() => {
-                showToast('Masuk dengan Mode Offline (LocalStorage)!', 'success');
-                onAuthSuccess({
-                  uid: 'local-trader-id',
-                  displayName: 'Local Trader',
-                  email: 'local@trader.io',
-                  isLocal: true,
-                });
-              }}
-              className="w-full py-3 bg-cat-mauve hover:bg-cat-pink text-cat-crust text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer select-none"
-            >
-              <span className="text-sm shrink-0">💾</span>
-              <span>Gunakan Mode Offline (Lokal)</span>
-            </button>
+        <form onSubmit={handleCreateProfile} className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-cat-overlay2 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <User className="h-3.5 w-3.5 text-cat-mauve" />
+              <span>Nama Trader / Nickname</span>
+            </label>
+            <input
+              type="text"
+              required
+              maxLength={20}
+              placeholder="Contoh: Sang Scalper"
+              value={traderName}
+              onChange={e => setTraderName(e.target.value)}
+              className="w-full bg-cat-base border border-cat-surface0 focus:border-cat-peach text-cat-text text-sm p-3.5 rounded-xl focus:outline-none placeholder:text-cat-surface2 font-bold focus:ring-0"
+            />
           </div>
-        )}
 
-        <div className="mt-6 border-t border-cat-surface0/30 pt-4 text-center">
+          <div>
+            <label className="block text-[10px] font-black text-cat-overlay2 uppercase tracking-wider mb-1.5">
+              Pilih Avatar Anda
+            </label>
+            <div className="grid grid-cols-5 gap-2 bg-cat-base p-2.5 rounded-xl border border-cat-surface0">
+              {AVATAR_OPTIONS.map(av => (
+                <button
+                  key={av}
+                  type="button"
+                  onClick={() => setSelectedAvatar(av)}
+                  className={`text-xl p-1.5 rounded-lg transition-all aspect-square flex items-center justify-center cursor-pointer ${
+                    selectedAvatar === av
+                      ? 'bg-cat-mauve text-cat-crust scale-110 shadow-sm'
+                      : 'hover:bg-cat-surface0'
+                  }`}
+                >
+                  {av}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-cat-overlay2 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Wallet className="h-3.5 w-3.5 text-cat-green" />
+              <span>Mata Uang Jurnal Utama</span>
+            </label>
+            <select
+              value={currency}
+              onChange={e => setCurrency(e.target.value)}
+              className="w-full bg-cat-base border border-cat-surface0 focus:border-cat-peach text-cat-text text-sm p-3 rounded-xl focus:outline-none font-bold"
+            >
+              <option value="IDR">IDR (Rupiah - Rp)</option>
+              <option value="USD">USD (Dollar - $)</option>
+              <option value="EUR">EUR (Euro - €)</option>
+              <option value="GBP">GBP (Sterling - £)</option>
+              <option value="JPY">JPY (Yen - ¥)</option>
+              <option value="SGD">SGD (S-Dollar - S$)</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 bg-cat-mauve hover:bg-cat-pink text-cat-crust text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 select-none flex items-center justify-center gap-2 mt-2"
+          >
+            <span>{loading ? 'MENYIAPKAN RUANG...' : 'MULAI MENJURNAL LOKAL ➔'}</span>
+          </button>
+        </form>
+
+        <div className="mt-5 border-t border-cat-surface0/30 pt-4 text-center space-y-2">
+          <div className="flex items-center justify-center gap-1 text-[10px] text-cat-green font-bold bg-cat-green/10 py-1.5 px-2.5 rounded-lg border border-cat-green/20">
+            <MonitorCheck className="h-3.5 w-3.5" />
+            <span>PWA Instalasi Aktif! Bisa di-install di HP Anda</span>
+          </div>
           <p className="text-[9px] text-cat-overlay2 leading-relaxed font-semibold">
-            Pilih <span className="text-cat-mauve">Mode Offline</span> untuk menyimpan data instan langsung di browser HP/Laptop Anda tanpa perlu konfigurasi Firebase. Praktis, cepat, dan 100% aman mandiri!
+            Semua data transaksi, akun, & strategi Anda disimpan 100% aman dan privasi penuh di browser perangkat Anda menggunakan LocalStorage ter-enkripsi.
           </p>
         </div>
       </motion.div>

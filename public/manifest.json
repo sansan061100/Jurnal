@@ -1,0 +1,24 @@
+{
+  "name": "Trading Journal Pro",
+  "short_name": "TradeJournal",
+  "description": "Pro-Grade Performance Trading Journal & Analytics PWA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#11111b",
+  "theme_color": "#cba6f7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
