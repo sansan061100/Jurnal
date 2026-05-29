@@ -1,0 +1,6 @@
+{
+  "name": "Jurnal Trading",
+  "description": "Trading journal dengan manajemen multi-akun, analisis performa harian/bulanan, kalender P&L, dan CRUD trade lengkap.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

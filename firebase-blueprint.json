@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Trading or prop firm account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "startingBalance": { "type": "number" },
+        "currency": { "type": "string" },
+        "broker": { "type": "string" },
+        "leverage": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "type": { "type": "string", "enum": ["STANDARD", "PROPFIRM"] },
+        "targetProfit": { "type": "number" },
+        "maxTotalLoss": { "type": "number" },
+        "maxDailyLoss": { "type": "number" },
+        "minTradingDays": { "type": "number" }
+      },
+      "required": ["id", "userId", "name", "startingBalance", "currency", "broker", "createdAt", "type"]
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "Trading order logged in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "userId": { "type": "string" },
+        "pair": { "type": "string" },
+        "action": { "type": "string", "enum": ["BUY", "SELL"] },
+        "lotSize": { "type": "number" },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "stopLoss": { "type": "number" },
+        "takeProfit": { "type": "number" },
+        "pnl": { "type": "number" },
+        "entryDate": { "type": "string" },
+        "exitDate": { "type": "string" },
+        "session": { "type": "string", "enum": ["Asian", "London", "New York", "Other"] },
+        "strategy": { "type": "string" },
+        "notes": { "type": "string" },
+        "rrRatio": { "type": "number" },
+        "rMultiple": { "type": "number" }
+      },
+      "required": ["id", "accountId", "userId", "pair", "action", "lotSize", "entryPrice", "exitPrice", "pnl", "entryDate", "exitDate", "session"]
+    },
+    "BalanceTransaction": {
+      "title": "BalanceTransaction",
+      "description": "Funding or mutation log of deposits and withdrawals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "accountId": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["DEPOSIT", "WITHDRAWAL"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "accountId", "userId", "type", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Store individual user profiles and settings"
+    },
+    "accounts/{accountId}": {
+      "schema": "Account",
+      "description": "Store individual trading or prop firm accounts"
+    },
+    "trades/{tradeId}": {
+      "schema": "Trade",
+      "description": "Store all recorded closed trades"
+    },
+    "balance_transactions/{transactionId}": {
+      "schema": "BalanceTransaction",
+      "description": "Store funding history logs for accounts"
+    }
+  }
+}

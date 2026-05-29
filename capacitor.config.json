@@ -1,0 +1,8 @@
+{
+  "appId": "com.jurnaltrading.app",
+  "appName": "Jurnal Trading Pro",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
