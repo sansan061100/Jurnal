@@ -181,12 +181,34 @@ export default function AuthScreen({ onAuthSuccess, showToast }: AuthScreenProps
             >
               Atau gunakan Email & Sandi
             </button>
+
+            <div className="relative flex py-1 items-center">
+              <div className="flex-grow border-t border-cat-surface0/20"></div>
+              <span className="flex-shrink mx-3 text-[9px] text-cat-overlay0 font-bold uppercase tracking-widest">Atau Tanpa Config</span>
+              <div className="flex-grow border-t border-cat-surface0/20"></div>
+            </div>
+
+            <button
+              onClick={() => {
+                showToast('Masuk dengan Mode Offline (LocalStorage)!', 'success');
+                onAuthSuccess({
+                  uid: 'local-trader-id',
+                  displayName: 'Local Trader',
+                  email: 'local@trader.io',
+                  isLocal: true,
+                });
+              }}
+              className="w-full py-3 bg-cat-mauve hover:bg-cat-pink text-cat-crust text-xs font-black uppercase tracking-wider rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer select-none"
+            >
+              <span className="text-sm shrink-0">💾</span>
+              <span>Gunakan Mode Offline (Lokal)</span>
+            </button>
           </div>
         )}
 
         <div className="mt-6 border-t border-cat-surface0/30 pt-4 text-center">
           <p className="text-[9px] text-cat-overlay2 leading-relaxed font-semibold">
-            Zero-Trust Cloud Encryption. Semua jurnal & data statistik Anda diproteksi dan disimpan aman di platform serverless Google Cloud Firestore.
+            Pilih <span className="text-cat-mauve">Mode Offline</span> untuk menyimpan data instan langsung di browser HP/Laptop Anda tanpa perlu konfigurasi Firebase. Praktis, cepat, dan 100% aman mandiri!
           </p>
         </div>
       </motion.div>

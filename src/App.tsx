@@ -144,6 +144,31 @@ export default function App() {
       return;
     }
 
+    if (currentUser.isLocal) {
+      const storedAccountStr = localStorage.getItem('tj_local_accounts');
+      const storedTradeStr = localStorage.getItem('tj_local_trades');
+      const storedTxStr = localStorage.getItem('tj_local_tx');
+
+      let localAccounts: Account[] = [];
+      let localTrades: Trade[] = [];
+      let localTx: BalanceTransaction[] = [];
+
+      try { localAccounts = storedAccountStr ? JSON.parse(storedAccountStr) : []; } catch (e) { console.error(e); }
+      try { localTrades = storedTradeStr ? JSON.parse(storedTradeStr) : []; } catch (e) { console.error(e); }
+      try { localTx = storedTxStr ? JSON.parse(storedTxStr) : []; } catch (e) { console.error(e); }
+
+      setAccounts(localAccounts);
+      setTrades(localTrades);
+      setBalanceTransactions(localTx);
+
+      if (localAccounts.length > 0) {
+        setActiveAccountId(localAccounts[0].id);
+      } else {
+        setActiveAccountId('');
+      }
+      return;
+    }
+
     // 1. Listen to user accounts
     const qAccounts = query(collection(db, 'accounts'), where('userId', '==', currentUser.uid));
     const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
@@ -334,6 +359,22 @@ export default function App() {
         type: 'STANDARD',
       };
 
+      if (currentUser.isLocal) {
+        const updatedAccounts = editingAccount
+          ? accounts.map(a => a.id === id ? payload : a)
+          : [...accounts, payload];
+        setAccounts(updatedAccounts);
+        localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccounts));
+        showToast(editingAccount ? 'Informasi akun berhasil diubah!' : 'Akun trading baru telah didaftarkan lokal!', 'success');
+        setIsAccountModalOpen(false);
+        setEditingAccount(null);
+        
+        if (!activeAccountId || activeAccountId === '') {
+          setActiveAccountId(id);
+        }
+        return;
+      }
+
       await setDoc(doc(db, 'accounts', id), payload);
       showToast(editingAccount ? 'Informasi akun berhasil diubah!' : 'Akun trading baru telah didaftarkan cloud!', 'success');
       setIsAccountModalOpen(false);
@@ -355,11 +396,31 @@ export default function App() {
     setConfirmModal({
       isOpen: true,
       title: 'Hapus Akun Jurnal',
-      message: `Yakin ingin menghapus permanen akun "${accToRemove.name}" beserta seluruh histori transaksi & riwayat dananya di Cloud secara permanen? Tindakan ini tidak bisa dibatalkan.`,
+      message: `Yakin ingin menghapus permanen akun "${accToRemove.name}" beserta seluruh histori transaksi & riwayat dananya secara permanen? Tindakan ini tidak bisa dibatalkan.`,
       confirmText: 'Ya, Hapus Permanen',
       isDanger: true,
       onConfirm: async () => {
         try {
+          if (currentUser.isLocal) {
+            const updatedAccs = accounts.filter(a => a.id !== id);
+            const updatedTrades = trades.filter(t => t.accountId !== id);
+            const updatedTx = balanceTransactions.filter(tx => tx.accountId !== id);
+
+            setAccounts(updatedAccs);
+            setTrades(updatedTrades);
+            setBalanceTransactions(updatedTx);
+
+            localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccs));
+            localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
+            localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
+
+            showToast(`Akun "${accToRemove.name}" beserta datanya berhasil dihapus.`, 'info');
+            if (activeAccountId === id) {
+              setActiveAccountId(updatedAccs[0]?.id || '');
+            }
+            return;
+          }
+
           const relatedTrades = trades.filter(t => t.accountId === id);
           const relatedTx = balanceTransactions.filter(tx => tx.accountId === id);
 
@@ -414,6 +475,18 @@ export default function App() {
         rMultiple: form.rMultiple
       };
 
+      if (currentUser.isLocal) {
+        const updatedTrades = editingTrade
+          ? trades.map(t => t.id === id ? payload : t)
+          : [...trades, payload];
+        setTrades(updatedTrades);
+        localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
+        showToast(editingTrade ? 'Transaksi berhasil diperbarui!' : 'Transaksi baru berhasil disimpan di jurnal lokal!', 'success');
+        setIsTradeModalOpen(false);
+        setEditingTrade(null);
+        return;
+      }
+
       await setDoc(doc(db, 'trades', id), payload);
       showToast(editingTrade ? 'Transaksi berhasil diperbarui!' : 'Transaksi baru berhasil disimpan di jurnal!', 'success');
       setIsTradeModalOpen(false);
@@ -433,6 +506,14 @@ export default function App() {
       isDanger: true,
       onConfirm: async () => {
         try {
+          if (currentUser.isLocal) {
+            const updatedTrades = trades.filter(t => t.id !== id);
+            setTrades(updatedTrades);
+            localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
+            showToast('Transaksi berhasil dihapus dari jurnal lokal.', 'info');
+            return;
+          }
+
           await deleteDoc(doc(db, 'trades', id));
           showToast('Transaksi berhasil dihapus dari jurnal.', 'info');
         } catch (e) {
@@ -456,6 +537,14 @@ export default function App() {
         notes: notes.trim() || (type === 'DEPOSIT' ? 'Deposit saldo' : 'Withdraw saldo')
       };
 
+      if (currentUser.isLocal) {
+        const updatedTx = [...balanceTransactions, payload];
+        setBalanceTransactions(updatedTx);
+        localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
+        showToast('Transaksi mutasi saldo berhasil disimpan lokal!', 'success');
+        return;
+      }
+
       await setDoc(doc(db, 'balance_transactions', id), payload);
       showToast('Transaksi mutasi saldo berhasil disimpan!', 'success');
     } catch (e) {
@@ -473,6 +562,14 @@ export default function App() {
       isDanger: true,
       onConfirm: async () => {
         try {
+          if (currentUser.isLocal) {
+            const updatedTx = balanceTransactions.filter(tx => tx.id !== id);
+            setBalanceTransactions(updatedTx);
+            localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
+            showToast('Transaksi mutasi berhasil dibatalkan dari lokal.', 'info');
+            return;
+          }
+
           await deleteDoc(doc(db, 'balance_transactions', id));
           showToast('Transaksi mutasi berhasil dibatalkan.', 'info');
         } catch (e) {
@@ -487,11 +584,23 @@ export default function App() {
     setConfirmModal({
       isOpen: true,
       title: 'Reset Seluruh Jurnal',
-      message: 'Apakah Anda yakin ingin menghapus seluruh data jurnal, transaksi, & akun Anda di Cloud secara permanen? Data yang dihapus tidak dapat dipulihkan kembali.',
+      message: 'Apakah Anda yakin ingin menghapus seluruh data jurnal, transaksi, & akun Anda secara permanen? Data yang dihapus tidak dapat dipulihkan kembali.',
       confirmText: 'Ya, Reset Semua',
       isDanger: true,
       onConfirm: async () => {
         try {
+          if (currentUser.isLocal) {
+            setAccounts([]);
+            setTrades([]);
+            setBalanceTransactions([]);
+            localStorage.removeItem('tj_local_accounts');
+            localStorage.removeItem('tj_local_trades');
+            localStorage.removeItem('tj_local_tx');
+            showToast('Seluruh data lokal berhasil dibersihkan.', 'info');
+            setActiveAccountId('');
+            return;
+          }
+
           const accsToDelete = [...accounts];
           const tradesToDelete = [...trades];
           const txsToDelete = [...balanceTransactions];
@@ -514,6 +623,11 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      if (currentUser.isLocal) {
+        setCurrentUser(null);
+        showToast('Anda berhasil keluar dari sesi lokal.', 'info');
+        return;
+      }
       await signOut(auth);
       showToast('Anda berhasil keluar dari sesi.', 'info');
     } catch (err) {
