@@ -42,14 +42,23 @@ import PairsModal from './components/PairsModal';
 import OverviewTab from './components/OverviewTab';
 import CalendarTab from './components/CalendarTab';
 import TradesTab from './components/TradesTab';
-import AuthScreen from './components/AuthScreen';
 import ConfirmModal from './components/ConfirmModal';
+import ImportModal from './components/ImportModal';
 
 export default function App() {
   // --- AUTH STATE ---
   const [currentUser, setCurrentUser] = useState<any | null>(() => {
     const saved = localStorage.getItem('tj_local_user');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) return JSON.parse(saved);
+    const defaultUser = {
+      uid: 'local-trader-id',
+      displayName: 'Trader',
+      avatar: '📊',
+      currency: 'USD',
+      isLocal: true,
+    };
+    localStorage.setItem('tj_local_user', JSON.stringify(defaultUser));
+    return defaultUser;
   });
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
@@ -60,16 +69,19 @@ export default function App() {
   const [customPairs, setCustomPairs] = useState<TradingPair[]>(DEFAULT_TRADING_PAIRS);
   const [activeAccountId, setActiveAccountId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'calendar'>('overview');
-  
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('tj_theme') as 'light' | 'dark') || 'dark';
-  });
+
+  // Force Minimalism Light Theme on load
+  useEffect(() => {
+    const body = document.body;
+    body.classList.add('light');
+  }, []);
 
   // Drawer / Modal overlay states
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
   const [isPairsModalOpen, setIsPairsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Editing Modals State
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -79,7 +91,6 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPair, setFilterPair] = useState('ALL');
   const [filterSession, setFilterSession] = useState('ALL');
-  const [filterStrategy, setFilterStrategy] = useState('ALL');
   const [filterOutcome, setFilterOutcome] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
@@ -112,16 +123,7 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Theme observer
-  useEffect(() => {
-    localStorage.setItem('tj_theme', theme);
-    const body = document.body;
-    if (theme === 'light') {
-      body.classList.add('light');
-    } else {
-      body.classList.remove('light');
-    }
-  }, [theme]);
+
 
   // Sync core local storage states
   useEffect(() => {
@@ -171,7 +173,7 @@ export default function App() {
   const savePairsToStorage = (updatedPairs: TradingPair[]) => {
     setCustomPairs(updatedPairs);
     localStorage.setItem('tj_custom_pairs', JSON.stringify(updatedPairs));
-    showToast('Daftar pair kustom berhasil diperbarui!', 'success');
+    showToast('Custom asset symbols successfully updated!', 'success');
   };
 
   // --- ACTIVE DATA RESOLVERS ---
@@ -231,7 +233,6 @@ export default function App() {
       result = result.filter(
         t =>
           t.pair.toLowerCase().includes(q) ||
-          t.strategy.toLowerCase().includes(q) ||
           t.notes.toLowerCase().includes(q)
       );
     }
@@ -241,9 +242,6 @@ export default function App() {
     }
     if (filterSession !== 'ALL') {
       result = result.filter(t => t.session === filterSession);
-    }
-    if (filterStrategy !== 'ALL') {
-      result = result.filter(t => t.strategy === filterStrategy);
     }
     if (filterOutcome !== 'ALL') {
       if (filterOutcome === 'WIN') {
@@ -257,7 +255,7 @@ export default function App() {
 
     result.sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
     return result;
-  }, [activeAccountTrades, searchTerm, filterPair, filterSession, filterStrategy, filterOutcome]);
+  }, [activeAccountTrades, searchTerm, filterPair, filterSession, filterOutcome]);
 
   const paginatedTrades = useMemo(() => {
     const startIdx = (currentPage - 1) * itemsPerPage;
@@ -268,7 +266,7 @@ export default function App() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterPair, filterSession, filterStrategy, filterOutcome]);
+  }, [searchTerm, filterPair, filterSession, filterOutcome]);
 
   // --- PERSISTENCE CLOUD HANDLERS ---
   const handleOpenAccountModal = (acc: Account | null = null) => {
@@ -298,7 +296,7 @@ export default function App() {
         : [...accounts, payload];
       setAccounts(updatedAccounts);
       localStorage.setItem('tj_local_accounts', JSON.stringify(updatedAccounts));
-      showToast(editingAccount ? 'Informasi akun berhasil diubah!' : 'Akun trading baru telah didaftarkan!', 'success');
+      showToast(editingAccount ? 'Account settings updated successfully!' : 'New portfolio account registered!', 'success');
       setIsAccountModalOpen(false);
       setEditingAccount(null);
       
@@ -306,7 +304,7 @@ export default function App() {
         setActiveAccountId(id);
       }
     } catch (e) {
-      showToast('Gagal menyimpan akun.', 'error');
+      showToast('Failed to save account settings.', 'error');
     }
   };
 
@@ -317,9 +315,9 @@ export default function App() {
 
     setConfirmModal({
       isOpen: true,
-      title: 'Hapus Akun Jurnal',
-      message: `Yakin ingin menghapus secara permanen akun "${accToRemove.name}" beserta seluruh histori transaksi & riwayat dananya dari penyimpanan lokal? Tindakan ini tidak bisa dibatalkan.`,
-      confirmText: 'Ya, Hapus Permanen',
+      title: 'Delete Portfolio Account',
+      message: `Are you sure you want to permanently delete "${accToRemove.name}" and all its transaction history from local storage? This action cannot be undone.`,
+      confirmText: 'Yes, Delete Permanently',
       isDanger: true,
       onConfirm: () => {
         try {
@@ -335,12 +333,12 @@ export default function App() {
           localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
           localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
 
-          showToast(`Akun "${accToRemove.name}" beserta datanya berhasil dihapus.`, 'info');
+          showToast(`Portfolio "${accToRemove.name}" was successfully deleted from local storage.`, 'info');
           if (activeAccountId === id) {
             setActiveAccountId(updatedAccs[0]?.id || '');
           }
         } catch (e) {
-          showToast('Gagal menghapus akun.', 'error');
+          showToast('Failed to delete the portfolio account.', 'error');
         }
       }
     });
@@ -348,7 +346,7 @@ export default function App() {
 
   const handleOpenTradeModal = (trade: Trade | null = null) => {
     if (!activeAccount) {
-      alert('Silakan buat akun trading terlebih dahulu sebelum mencatat transaksi!');
+      alert('Please create a portfolio account first before logging transactions!');
       return;
     }
     setEditingTrade(trade);
@@ -372,7 +370,6 @@ export default function App() {
         entryDate: form.entryDate,
         exitDate: form.exitDate,
         session: form.session,
-        strategy: form.strategy,
         notes: form.notes || '',
         stopLoss: form.stopLoss,
         takeProfit: form.takeProfit,
@@ -385,11 +382,11 @@ export default function App() {
         : [...trades, payload];
       setTrades(updatedTrades);
       localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
-      showToast(editingTrade ? 'Transaksi berhasil diperbarui!' : 'Transaksi baru berhasil disimpan di jurnal!', 'success');
+      showToast(editingTrade ? 'Transaction updated successfully!' : 'New trade transaction logged successfully!', 'success');
       setIsTradeModalOpen(false);
       setEditingTrade(null);
     } catch (e) {
-      showToast('Gagal menyimpan transaksi.', 'error');
+      showToast('Failed to log the transaction.', 'error');
     }
   };
 
@@ -397,18 +394,18 @@ export default function App() {
     if (!currentUser) return;
     setConfirmModal({
       isOpen: true,
-      title: 'Hapus Transaksi',
-      message: 'Hapus transaksi ini dari jurnal Anda secara permanen?',
-      confirmText: 'Ya, Hapus',
+      title: 'Delete Transaction',
+      message: 'Are you sure you want to delete this transaction from your journal permanently?',
+      confirmText: 'Yes, Delete',
       isDanger: true,
       onConfirm: () => {
         try {
           const updatedTrades = trades.filter(t => t.id !== id);
           setTrades(updatedTrades);
           localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
-          showToast('Transaksi berhasil dihapus dari jurnal.', 'info');
+          showToast('Transaction deleted from performance logs.', 'info');
         } catch (e) {
-          showToast('Gagal menghapus transaksi.', 'error');
+          showToast('Failed to delete the transaction.', 'error');
         }
       }
     });
@@ -425,15 +422,15 @@ export default function App() {
         type,
         amount,
         date: new Date().toISOString(),
-        notes: notes.trim() || (type === 'DEPOSIT' ? 'Deposit saldo' : 'Withdraw saldo')
+        notes: notes.trim() || (type === 'DEPOSIT' ? 'Deposit' : 'Withdrawal')
       };
 
       const updatedTx = [...balanceTransactions, payload];
       setBalanceTransactions(updatedTx);
       localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
-      showToast('Transaksi mutasi saldo berhasil disimpan!', 'success');
+      showToast('Balance ledger updated successfully!', 'success');
     } catch (e) {
-      showToast('Gagal mutasi saldo.', 'error');
+      showToast('Failed to record balance transaction.', 'error');
     }
   };
 
@@ -441,30 +438,43 @@ export default function App() {
     if (!currentUser) return;
     setConfirmModal({
       isOpen: true,
-      title: 'Batalkan Mutasi',
-      message: 'Batal mutasi transaksi ini? Saldo Anda akan disesuaikan secara otomatis.',
-      confirmText: 'Ya, Batalkan',
+      title: 'Revoke Transaction',
+      message: 'Are you sure you want to revoke this transaction? Your capital balance will be re-adjusted immediately.',
+      confirmText: 'Yes, Revoke',
       isDanger: true,
       onConfirm: () => {
         try {
           const updatedTx = balanceTransactions.filter(tx => tx.id !== id);
           setBalanceTransactions(updatedTx);
           localStorage.setItem('tj_local_tx', JSON.stringify(updatedTx));
-          showToast('Transaksi mutasi berhasil dibatalkan.', 'info');
+          showToast('Ledger transaction revoked.', 'info');
         } catch (e) {
-          showToast('Gagal membatalkan mutasi.', 'error');
+          showToast('Failed to revoke balance transaction.', 'error');
         }
       }
     });
+  };
+
+  const handleImportTrades = (importedTrades: Trade[]) => {
+    try {
+      const updatedTrades = [...trades, ...importedTrades];
+      setTrades(updatedTrades);
+      localStorage.setItem('tj_local_trades', JSON.stringify(updatedTrades));
+      showToast(`Imported ${importedTrades.length} transactions into portfolio successfully!`, 'success');
+      setIsImportModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to commit imported transaction records.', 'error');
+    }
   };
 
   const clearAllData = () => {
     if (!currentUser) return;
     setConfirmModal({
       isOpen: true,
-      title: 'Reset Seluruh Jurnal',
-      message: 'Apakah Anda yakin ingin menghapus seluruh data jurnal, transaksi, & akun Anda secara permanen? Data yang di-reset tidak dapat dipulihkan kembali.',
-      confirmText: 'Ya, Reset Semua',
+      title: 'Wipe All Portfolio Data',
+      message: 'Are you sure you want to wipe all registered portfolios, transaction ledgers, and database entries? This action is absolutely irreversible.',
+      confirmText: 'Yes, Wipe Everything',
       isDanger: true,
       onConfirm: () => {
         try {
@@ -474,98 +484,60 @@ export default function App() {
           localStorage.removeItem('tj_local_accounts');
           localStorage.removeItem('tj_local_trades');
           localStorage.removeItem('tj_local_tx');
-          showToast('Seluruh data lokal berhasil dibersihkan.', 'info');
+          showToast('All local database statistics successfully wiped.', 'info');
           setActiveAccountId('');
         } catch (e) {
-          showToast('Gagal membersihkan data.', 'error');
+          showToast('Failed to clear database logs.', 'error');
         }
       }
     });
   };
 
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('tj_local_user');
-      setCurrentUser(null);
-      showToast('Anda berhasil keluar dari sesi lokal.', 'info');
-    } catch (err) {
-      console.error(err);
-      showToast('Gagal keluar sesi.', 'error');
-    }
-  };
-
   // --- RENDER PORTALS ---
 
-  // Auth Guard
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-cat-crust text-cat-text flex flex-col justify-center items-center">
-        <div className="w-10 h-10 border-4 border-cat-lavender border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-[10px] text-cat-subtext uppercase tracking-widest font-black">Menghubungkan Jurnal Cloud...</p>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return <AuthScreen onAuthSuccess={(user) => setCurrentUser(user)} showToast={showToast} />;
-  }
-
   return (
-    <div className="min-h-screen bg-cat-crust text-cat-text flex flex-col font-sans select-none relative overflow-x-hidden">
-      {/* Background Decorative Ambient Radial Pastels */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-cat-blue/15 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-cat-pink/15 blur-[100px] pointer-events-none" />
-
-      {/* Main Container - Full Screen display */}
-      <div className="w-full min-h-screen bg-cat-base relative flex flex-col">
+    <div className="h-screen w-screen bg-cat-base text-zinc-950 flex flex-col font-sans select-none relative overflow-hidden">
+      {/* Sleek Modern Minimalist App frame taking full viewport */}
+      <div className="w-full h-full bg-white relative flex flex-col flex-1 overflow-hidden">
         
         {/* Dynamic Top App Header */}
-        <header className="bg-cat-mantle/85 border-b border-cat-surface0/60 sticky top-0 z-30">
-          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl bg-cat-mauve/20 flex items-center justify-center font-extrabold text-cat-mauve text-xs">
+        <header className="bg-cat-mantle border-b border-zinc-200/80 shrink-0 z-30">
+          <div className="w-full px-4 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 border border-zinc-200 bg-zinc-50 text-cat-text flex items-center justify-center font-bold text-sm uppercase rounded-lg">
                 {activeAccount?.name ? activeAccount.name.charAt(0).toUpperCase() : '➕'}
               </div>
               <div className="text-left">
-                <span className="text-[9px] text-cat-subtext font-bold uppercase tracking-wider block leading-none">
+                <span className="text-[8px] text-zinc-400 font-extrabold uppercase tracking-widest block leading-none">
                   TRADING ACCOUNT
                 </span>
                 <button
                   onClick={() => setIsSettingsOpen(true)}
-                  className="text-xs font-extrabold text-cat-lavender hover:text-cat-pink transition flex items-center gap-1 mt-0.5 leading-none cursor-pointer"
+                  className="text-xs font-bold text-cat-text hover:text-zinc-500 transition flex items-center gap-1 mt-1 leading-none cursor-pointer uppercase tracking-wider"
                 >
-                  {activeAccount?.name || 'Buat Akun'} ▾
+                  {activeAccount?.name || 'Create Account'} ▾
                 </button>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5">
-              {/* Theme switcher */}
-              <button
-                onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-                className="px-2.5 py-1.5 border border-cat-surface1 hover:border-cat-surface2 hover:bg-cat-surface0 bg-cat-base/40 text-cat-lavender hover:text-cat-text rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 font-bold"
-                title="Ganti Tema (Gelap Catppuccin / Terang Brutalism)"
-              >
-                <span className="text-[10px] uppercase tracking-wider font-black shrink-0 select-none">
-                  {theme === 'dark' ? '🐈‍⬛ Catppuccin' : '⚡ Brutalism'}
-                </span>
-              </button>
+
 
               {/* Quick Add Trade button */}
               {accounts.length > 0 && (
                 <button
                   onClick={() => handleOpenTradeModal(null)}
-                  title="Catat Transaksi Baru"
-                  className="bg-cat-peach hover:bg-cat-yellow text-cat-crust p-2 rounded-xl transition-all shadow-md shadow-cat-peach/10 cursor-pointer"
+                  title="Log New Operation"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white p-2 rounded-lg border border-transparent transition-all cursor-pointer shadow-sm hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <Plus className="h-4 w-4 font-black" />
+                  <Plus className="h-4 w-4 font-bold" />
                 </button>
               )}
 
               {/* Quick settings gear drawer */}
               <button
                 onClick={() => setIsSettingsOpen(prev => !prev)}
-                className="p-2 border border-cat-surface1 hover:border-cat-surface2 hover:bg-cat-surface0 bg-cat-base/40 text-cat-lavender hover:text-cat-text rounded-xl transition cursor-pointer"
+                className="p-2 border border-zinc-200 rounded-lg bg-zinc-50/50 hover:bg-zinc-100 text-cat-text transition cursor-pointer"
               >
                 <Sliders className="h-4 w-4" />
               </button>
@@ -580,7 +552,7 @@ export default function App() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 12 }}
               exit={{ opacity: 0, y: -20 }}
-              className={`absolute top-12 left-4 right-4 z-50 px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 border text-xs font-bold leading-relaxed ${
+              className={`absolute top-16 left-4 right-4 z-50 px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 border text-xs font-bold leading-relaxed ${
                 toast.type === 'success'
                   ? 'bg-cat-green/10 text-cat-green border-cat-green/20'
                   : toast.type === 'error'
@@ -594,40 +566,33 @@ export default function App() {
         </AnimatePresence>
 
         {/* Main core view */}
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 py-4 mb-24 relative">
+        <main className="flex-1 w-full overflow-y-auto px-4 py-6 pb-6 relative scrollbar-none">
           
           {/* ONBOARDING MANDATE SCREEN */}
           {accounts.length === 0 ? (
-            <div className="absolute inset-0 bg-cat-base z-30 flex flex-col items-center justify-center px-6 py-8 text-center">
+            <div className="absolute inset-0 bg-cat-base z-30 flex flex-col items-center justify-center px-6 py-8 text-center select-none">
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-cat-mantle border border-cat-surface0 rounded-[32px] p-6 space-y-5 shadow-xl max-w-xs"
+                className="bg-cat-mantle border-2 border-cat-surface0 rounded-[32px] p-6 space-y-5 shadow-xl max-w-xs"
               >
-                <div className="w-12 h-12 bg-cat-mauve/15 rounded-2xl flex items-center justify-center text-cat-mauve mx-auto">
+                <div className="w-12 h-12 bg-cat-mauve/15 rounded-2xl flex items-center justify-center text-cat-mauve mx-auto border-2 border-cat-surface0">
                   <Award className="h-6 w-6 stroke-[2]" />
                 </div>
                 
                 <div className="space-y-1.5">
-                  <h2 className="text-sm font-black text-cat-text uppercase tracking-wide">Akun Pertama Anda</h2>
-                  <p className="text-[11px] text-cat-subtext leading-relaxed font-semibold">
-                    Selamat bergabung! Untuk mulai menjurnal & mengevaluasi performa transaksi Anda, daftarkan akun portofolio pertama Anda terlebih dahulu.
+                  <h2 className="text-sm font-black text-cat-text uppercase tracking-widest">Register Your First Portfolio</h2>
+                  <p className="text-[11px] text-cat-subtext leading-relaxed font-bold">
+                     Welcome! To start logging, charting, and evaluating your transaction operations, please register your first portfolio account.
                   </p>
                 </div>
 
                 <button
                   onClick={() => setIsAccountModalOpen(true)}
-                  className="w-full py-3.5 bg-cat-peach hover:bg-cat-yellow text-cat-crust text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-cat-peach/10 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full py-3.5 bg-cat-peach hover:bg-cat-yellow text-cat-base border-2 border-cat-surface0 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:shadow-none active:translate-y-0.5 cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <span>Daftarkan Akun Baru</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-
-                <button 
-                  onClick={handleLogout}
-                  className="block mx-auto text-[10px] text-cat-subtext hover:text-cat-text font-bold uppercase transition"
-                >
-                  Log Out Akun
+                  <span>Register Portfolio</span>
+                  <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                 </button>
               </motion.div>
             </div>
@@ -658,8 +623,6 @@ export default function App() {
                   setFilterPair={setFilterPair}
                   filterSession={filterSession}
                   setFilterSession={setFilterSession}
-                  filterStrategy={filterStrategy}
-                  setFilterStrategy={setFilterStrategy}
                   filterOutcome={filterOutcome}
                   setFilterOutcome={setFilterOutcome}
                   currentPage={currentPage}
@@ -687,59 +650,61 @@ export default function App() {
           )}
         </main>
 
-        {/* Fixed Mobile Bottom Custom Dock Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-cat-mantle/95 border-t border-cat-surface0/60 p-1 z-40 flex justify-center shadow-lg backdrop-blur-xs">
-          <div className="flex flex-row justify-around w-full max-w-md px-1 pt-1.5 pb-2">
-            {/* Overview Tab Button */}
-            <button
-              onClick={() => setActiveTab('overview')}
-              disabled={accounts.length === 0}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all rounded-2xl cursor-pointer disabled:opacity-30 ${
-                activeTab === 'overview'
-                  ? 'text-cat-mauve text-semibold bg-cat-surface0/20'
-                  : 'text-cat-subtext hover:text-cat-text'
-              }`}
-            >
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-[8px] font-bold mt-1 uppercase tracking-wider">Dashboard</span>
-            </button>
+        {/* Sleek Fixed Bottom Tab Navigation */}
+        {accounts.length > 0 && (
+          <nav className="bg-white border-t border-zinc-100/80 z-40 select-none shrink-0 w-full">
+            <div className="max-w-md mx-auto grid grid-cols-3 gap-1 py-1.5 px-2">
+              {/* Overview Tab Button */}
+              <button
+                onClick={() => setActiveTab('overview')}
+                disabled={accounts.length === 0}
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-40 select-none ${
+                  activeTab === 'overview'
+                    ? 'text-zinc-950 bg-zinc-50 font-bold'
+                    : 'text-zinc-400 hover:text-zinc-600 bg-transparent'
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-[10px] font-semibold">Overview</span>
+              </button>
 
-            {/* Trades Tab Button */}
-            <button
-              onClick={() => setActiveTab('trades')}
-              disabled={accounts.length === 0}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all rounded-2xl cursor-pointer disabled:opacity-30 ${
-                activeTab === 'trades'
-                  ? 'text-cat-mauve text-semibold bg-cat-surface0/20'
-                  : 'text-cat-subtext hover:text-cat-text'
-              }`}
-            >
-              <div className="relative flex items-center justify-center">
-                <Database className="h-4 w-4" />
-                {activeAccountTrades.length > 0 && (
-                  <span className="absolute -top-1.5 -right-2 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-cat-peach text-cat-crust text-[8px] font-black px-1 leading-none shadow-sm">
-                    {activeAccountTrades.length}
-                  </span>
-                )}
-              </div>
-              <span className="text-[8px] font-bold mt-1 uppercase tracking-wider">Jurnal</span>
-            </button>
+              {/* Trades Tab Button */}
+              <button
+                onClick={() => setActiveTab('trades')}
+                disabled={accounts.length === 0}
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-40 select-none ${
+                  activeTab === 'trades'
+                    ? 'text-zinc-950 bg-zinc-50 font-bold'
+                    : 'text-zinc-400 hover:text-zinc-600 bg-transparent'
+                }`}
+              >
+                <div className="relative flex flex-col items-center justify-center gap-1">
+                  <Database className="h-4 w-4" />
+                  {activeAccountTrades.length > 0 && (
+                    <span className="absolute -top-1 -right-3.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-zinc-900 text-white text-[8px] font-bold px-1 select-none leading-none">
+                      {activeAccountTrades.length}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-semibold">Ledger</span>
+              </button>
 
-            {/* Calendar Tab Button */}
-            <button
-              onClick={() => setActiveTab('calendar')}
-              disabled={accounts.length === 0}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all rounded-2xl cursor-pointer disabled:opacity-30 ${
-                activeTab === 'calendar'
-                  ? 'text-cat-mauve text-semibold bg-cat-surface0/20'
-                  : 'text-cat-subtext hover:text-cat-text'
-              }`}
-            >
-              <CalendarIcon className="h-4 w-4" />
-              <span className="text-[8px] font-bold mt-1 uppercase tracking-wider">Kalender</span>
-            </button>
-          </div>
-        </nav>
+              {/* Calendar Tab Button */}
+              <button
+                onClick={() => setActiveTab('calendar')}
+                disabled={accounts.length === 0}
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-40 select-none ${
+                  activeTab === 'calendar'
+                    ? 'text-zinc-950 bg-zinc-50 font-bold'
+                    : 'text-zinc-400 hover:text-zinc-600 bg-transparent'
+                }`}
+              >
+                <CalendarIcon className="h-4 w-4" />
+                <span className="text-[10px] font-semibold">Calendar</span>
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
 
       {/* --- DRAWERS & DIALOG OVERLAYS --- */}
@@ -757,8 +722,8 @@ export default function App() {
             onOpenAccountModal={handleOpenAccountModal}
             onDeleteAccount={handleDeleteAccount}
             onClearAllData={clearAllData}
-            onLogout={handleLogout}
             onOpenPairsModal={() => setIsPairsModalOpen(true)}
+            onOpenImportModal={() => setIsImportModalOpen(true)}
           />
         )}
       </AnimatePresence>
@@ -796,6 +761,18 @@ export default function App() {
             onClose={() => setIsPairsModalOpen(false)}
             customPairs={customPairs}
             onSavePairs={savePairsToStorage}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isImportModalOpen && (
+          <ImportModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            activeAccountId={activeAccountId}
+            userId={currentUser?.uid || 'local-trader-id'}
+            onImportSuccess={handleImportTrades}
           />
         )}
       </AnimatePresence>

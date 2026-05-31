@@ -5,12 +5,9 @@ import {
   X,
   Plus,
   Trash2,
-  LogOut,
-  Briefcase,
-  Sliders,
-  Award,
   FileText,
-  Coins
+  Coins,
+  ArrowDownToLine
 } from 'lucide-react';
 import { Account, Trade } from '../types';
 
@@ -26,8 +23,8 @@ interface SettingsDrawerProps {
   onOpenAccountModal: (account: Account | null) => void;
   onDeleteAccount: (id: string) => void;
   onClearAllData: () => void;
-  onLogout: () => void;
   onOpenPairsModal: () => void;
+  onOpenImportModal: () => void;
 }
 
 export default function SettingsDrawer({
@@ -42,8 +39,8 @@ export default function SettingsDrawer({
   onOpenAccountModal,
   onDeleteAccount,
   onClearAllData,
-  onLogout,
-  onOpenPairsModal
+  onOpenPairsModal,
+  onOpenImportModal
 }: SettingsDrawerProps) {
   if (!isOpen) return null;
 
@@ -57,12 +54,12 @@ export default function SettingsDrawer({
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
     doc.setTextColor(30, 30, 46);
-    doc.text('LAPORAN PERFORMA TRADING', 14, 25);
+    doc.text('TRADING JOURNAL PERFORMANCE REPORT', 14, 25);
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(110, 115, 140);
-    const dateStr = new Date().toLocaleDateString('id-ID', {
+    const dateStr = new Date().toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -70,27 +67,27 @@ export default function SettingsDrawer({
       hour: '2-digit',
       minute: '2-digit'
     });
-    doc.text(`Unduh pada: ${dateStr}`, 14, 32);
+    doc.text(`Generated on: ${dateStr}`, 14, 32);
     
     // Horizontal divider
     doc.setDrawColor(220, 224, 232);
     doc.setLineWidth(0.5);
     doc.line(14, 36, 196, 36);
     
-    // Section 1: Profil Akun
+    // Section 1: Account Profile
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(30, 30, 46);
-    doc.text('I. PROFIL AKUN PORTFOLIO', 14, 46);
+    doc.text('I. PORTFOLIO PROFILE & SETTINGS', 14, 46);
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('Nama Akun:', 14, 54);
+    doc.text('Account Name:', 14, 54);
     doc.setFont('helvetica', 'normal');
     doc.text(String(activeAccount.name), 46, 54);
     
     doc.setFont('helvetica', 'bold');
-    doc.text('Tipe Akun:', 14, 60);
+    doc.text('Account Type:', 14, 60);
     doc.setFont('helvetica', 'normal');
     const accType = 'Standard Portfolio';
     doc.text(accType, 46, 60);
@@ -101,47 +98,46 @@ export default function SettingsDrawer({
     doc.text(String(activeAccount.broker || '-'), 46, 66);
     
     doc.setFont('helvetica', 'bold');
-    doc.text('Leverage Maks:', 14, 72);
+    doc.text('Max Leverage:', 14, 72);
     doc.setFont('helvetica', 'normal');
     doc.text(String(activeAccount.leverage || '-'), 46, 72);
 
     doc.setFont('helvetica', 'bold');
-    doc.text('Saldo Mulai:', 14, 78);
+    doc.text('Starting Balance:', 14, 78);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${currentCurrency} ${activeAccount.startingBalance.toLocaleString('id-ID')}`, 46, 78);
+    doc.text(`${currentCurrency} ${activeAccount.startingBalance.toLocaleString('en-US')}`, 46, 78);
     
-    // Section 2: Ringkasan Performa Utama (Stats Grid)
+    // Section 2: Performance Summary
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.text('II. PERFORMA & STATISTIK JURNAL', 14, 92);
+    doc.text('II. METRICS & PERFORMANCE STATS', 14, 92);
     
     doc.setFontSize(10);
     // Draw table headers for stats
     doc.setFillColor(242, 243, 245);
     doc.rect(14, 98, 182, 8, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.text('Parameter Performa', 16, 103);
-    doc.text('Nilai Rekaman', 120, 103);
+    doc.text('Performance Parameter', 16, 103);
+    doc.text('Recorded Value', 120, 103);
     
     // Draw row items
     const rows = [
-      { name: 'Total Transaksi (Trades)', value: `${stats.totalTrades} trades` },
-      { name: 'Win / Loss / BE', value: `${stats.wonTrades} Win / ${stats.lostTrades} Loss / ${stats.breakevenTrades} BE` },
-      { name: 'Tingkat Kemenangan (Win Rate)', value: `${stats.winRate.toFixed(1)}%` },
-      { name: 'Laba Bersih Berjalan (Net Profit)', value: `${currentCurrency} ${stats.netProfit.toLocaleString('id-ID')}` },
-      { name: 'Saldo Saat Ini (Current Balance)', value: `${currentCurrency} ${stats.currentBalance.toLocaleString('id-ID')}` },
-      { name: 'Profit Factor', value: stats.profitFactor === Infinity ? 'N/A' : (stats.profitFactor || 0).toFixed(2) },
-      { name: 'Rata-Rata Keuntungan (Avg Win)', value: `${currentCurrency} ${Math.round(stats.avgWin || 0).toLocaleString('id-ID')}` },
-      { name: 'Rata-Rata Kerugian (Avg Loss)', value: `${currentCurrency} ${Math.round(stats.avgLoss || 0).toLocaleString('id-ID')}` },
-      { name: 'Laba Terbaik (Best Trade)', value: `${currentCurrency} ${Math.round(stats.bestTrade || 0).toLocaleString('id-ID')}` },
-      { name: 'Rugi Terburuk (Worst Trade)', value: `${currentCurrency} ${Math.round(stats.worstTrade || 0).toLocaleString('id-ID')}` },
-      { name: 'Maksimum Drawdown Berjalan', value: `${(stats.maxDrawdown || 0).toFixed(2)}% (${currentCurrency} ${Math.round(stats.maxDrawdownVal || 0).toLocaleString('id-ID')})` }
+      { name: 'Total Trade Count', value: `${stats.totalTrades} operations` },
+      { name: 'Wins / Losses / Breakeven', value: `${stats.wonTrades} Wins / ${stats.lostTrades} Losses / ${stats.breakevenTrades} BE` },
+      { name: 'Win Rate Percentage', value: `${stats.winRate.toFixed(1)}%` },
+      { name: 'Net Consolidated Profit', value: `${currentCurrency} ${stats.netProfit.toLocaleString('en-US')}` },
+      { name: 'Current Liquid Balance', value: `${currentCurrency} ${stats.currentBalance.toLocaleString('en-US')}` },
+      { name: 'Profit Factor Index', value: stats.profitFactor === Infinity ? 'N/A' : (stats.profitFactor || 0).toFixed(2) },
+      { name: 'Average Profit per Win', value: `${currentCurrency} ${Math.round(stats.avgWin || 0).toLocaleString('en-US')}` },
+      { name: 'Average Loss per Defeat', value: `${currentCurrency} ${Math.round(stats.avgLoss || 0).toLocaleString('en-US')}` },
+      { name: 'Best Trade (Profit Peak)', value: `${currentCurrency} ${Math.round(stats.bestTrade || 0).toLocaleString('en-US')}` },
+      { name: 'Worst Trade (Loss Bottom)', value: `${currentCurrency} ${Math.round(stats.worstTrade || 0).toLocaleString('en-US')}` },
+      { name: 'Maximum System Drawdown', value: `${(stats.maxDrawdown || 0).toFixed(2)}% (${currentCurrency} ${Math.round(stats.maxDrawdownVal || 0).toLocaleString('en-US')})` }
     ];
     
     let currentY = 110;
     doc.setFont('helvetica', 'normal');
     rows.forEach((row, idx) => {
-      // Background shading on alternate rows
       if (idx % 2 === 1) {
         doc.setFillColor(247, 248, 250);
         doc.rect(14, currentY - 4, 182, 6, 'F');
@@ -149,12 +145,11 @@ export default function SettingsDrawer({
       doc.text(row.name, 16, currentY);
       doc.setFont('helvetica', 'bold');
       
-      // Color coding net profit
       if (row.name.includes('Net Profit')) {
         if (stats.netProfit >= 0) {
-          doc.setTextColor(46, 125, 50); // green
+          doc.setTextColor(46, 125, 50);
         } else {
-          doc.setTextColor(198, 40, 40); // red
+          doc.setTextColor(198, 40, 40);
         }
       } else {
         doc.setTextColor(30, 30, 46);
@@ -163,14 +158,11 @@ export default function SettingsDrawer({
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(30, 30, 46);
       
-      // Separator dot/line
       doc.setDrawColor(240, 240, 240);
       doc.line(14, currentY + 2, 196, currentY + 2);
       
       currentY += 6.5;
     });
-    
-    // Alternate row shading or other report headers can be added here if needed
     
     // Add trades detail table on second page
     if (activeAccountTrades && activeAccountTrades.length > 0) {
@@ -179,23 +171,22 @@ export default function SettingsDrawer({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
       doc.setTextColor(30, 30, 46);
-      doc.text('IV. DAFTAR RIWAYAT TRANSAKSI TERAKHIR', 14, 25);
+      doc.text('III. RECENT TRANSACTION CHRONICLE', 14, 25);
       
       doc.setFontSize(8);
       doc.setFillColor(242, 243, 245);
       doc.rect(14, 30, 182, 8, 'F');
-      doc.text('Tanggal', 16, 35);
-      doc.text('Pair', 50, 35);
-      doc.text('Aksi', 75, 35);
-      doc.text('Lot', 95, 35);
-      doc.text('Entry / Exit Price', 115, 35);
-      doc.text('Profit-Loss', 165, 35);
+      doc.text('Date', 16, 35);
+      doc.text('Symbol', 50, 35);
+      doc.text('Action', 75, 35);
+      doc.text('Lots', 95, 35);
+      doc.text('Entry / Exit', 115, 35);
+      doc.text('P&L Out', 165, 35);
       
       let finalY = 43;
       doc.setFont('helvetica', 'normal');
       
-      // Sort trades descending
-      const sortedTradesForReport = [...activeAccountTrades].sort((a,b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()).slice(0, 25); // Top 25 for aesthetic sizing
+      const sortedTradesForReport = [...activeAccountTrades].sort((a,b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()).slice(0, 25);
       
       sortedTradesForReport.forEach((t, idx) => {
         if (idx % 2 === 1) {
@@ -203,7 +194,7 @@ export default function SettingsDrawer({
           doc.rect(14, finalY - 4, 182, 6, 'F');
         }
         
-        const dateFormatted = new Date(t.entryDate).toLocaleDateString('id-ID', {
+        const dateFormatted = new Date(t.entryDate).toLocaleDateString('en-US', {
           day: '2-digit',
           month: 'short',
           year: '2-digit'
@@ -223,15 +214,15 @@ export default function SettingsDrawer({
         doc.setTextColor(30, 30, 46);
         
         doc.text(String(t.lotSize), 95, finalY);
-        doc.text(`${t.entryPrice.toLocaleString('id-ID')} -> ${t.exitPrice.toLocaleString('id-ID')}`, 115, finalY);
+        doc.text(`${t.entryPrice.toLocaleString('en-US')} -> ${t.exitPrice.toLocaleString('en-US')}`, 115, finalY);
         
         doc.setFont('helvetica', 'bold');
         if (t.pnl >= 0) {
           doc.setTextColor(46, 125, 50);
-          doc.text(`+${currentCurrency} ${Math.round(t.pnl).toLocaleString('id-ID')}`, 165, finalY);
+          doc.text(`+${currentCurrency} ${Math.round(t.pnl).toLocaleString('en-US')}`, 165, finalY);
         } else {
           doc.setTextColor(198, 40, 40);
-          doc.text(`-${currentCurrency} ${Math.abs(Math.round(t.pnl)).toLocaleString('id-ID')}`, 165, finalY);
+          doc.text(`-${currentCurrency} ${Math.abs(Math.round(t.pnl)).toLocaleString('en-US')}`, 165, finalY);
         }
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(30, 30, 46);
@@ -241,52 +232,48 @@ export default function SettingsDrawer({
         
         finalY += 6.5;
         
-        // Prevent overflow
         if (finalY > 280 && idx < sortedTradesForReport.length - 1) {
           doc.addPage();
           finalY = 25;
           doc.setFont('helvetica', 'bold');
-          doc.text('IV. DAFTAR RIWAYAT TRANSAKSI TERAKHIR (LANJUTAN)', 14, 15);
+          doc.text('III. RECENT TRANSACTION CHRONICLE (CONT.)', 14, 15);
           doc.setFontSize(8);
           doc.setFillColor(242, 243, 245);
           doc.rect(14, 18, 182, 8, 'F');
-          doc.text('Tanggal', 16, 23);
-          doc.text('Pair', 50, 23);
-          doc.text('Aksi', 75, 23);
-          doc.text('Lot', 95, 23);
-          doc.text('Entry / Exit Price', 115, 23);
-          doc.text('Profit-Loss', 165, 23);
+          doc.text('Date', 16, 23);
+          doc.text('Symbol', 50, 23);
+          doc.text('Action', 75, 23);
+          doc.text('Lots', 95, 23);
+          doc.text('Entry / Exit', 115, 23);
+          doc.text('P&L Out', 165, 23);
           finalY = 31;
           doc.setFont('helvetica', 'normal');
         }
       });
     }
     
-    // Bottom Signature footer
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(150, 155, 175);
     const totalPages = doc.getNumberOfPages();
     for(let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.text(`Aplikasi Jurnal Trading Pro • Evaluasi Cloud • Halaman ${i} dari ${totalPages}`, 14, 290);
+      doc.text(`Pro Trading Evaluation Journal • Page ${i} of ${totalPages}`, 14, 290);
     }
     
-    // Save report
-    const sanitizedFilename = `Laporan_Trading_${activeAccount.name.replace(/\s+/g, '_')}.pdf`;
+    const sanitizedFilename = `Trading_Report_${activeAccount.name.replace(/\s+/g, '_')}.pdf`;
     doc.save(sanitizedFilename);
   };
 
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center select-none">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-cat-crust/70 backdrop-blur-xs cursor-pointer"
+        className="fixed inset-0 bg-cat-crust/80 backdrop-blur-xs cursor-pointer"
       />
 
       {/* Sheet Content */}
@@ -295,18 +282,18 @@ export default function SettingsDrawer({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-        className="relative bg-cat-mantle border-t border-cat-surface1 rounded-t-[30px] w-full max-w-sm p-5 pb-8 shadow-2xl z-50 max-h-[85vh] overflow-y-auto"
+        className="relative bg-white border border-zinc-100 rounded-t-3xl w-full max-w-sm p-6 pb-8 shadow-2xl z-50 max-h-[85vh] overflow-y-auto"
       >
         {/* Drag handle pill */}
-        <div className="w-12 h-1 bg-cat-surface2 rounded-full mx-auto mb-5 opacity-60" />
+        <div className="w-12 h-1 bg-zinc-150 rounded-full mx-auto mb-5" />
 
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-black text-cat-lavender uppercase tracking-widest flex items-center gap-2">
-            💼 Portofolio & Jurnal
+        <div className="flex items-center justify-between mb-5 pb-3">
+          <h3 className="text-sm font-bold text-zinc-900 uppercase tracking-wider flex items-center gap-2">
+            💼 Portfolios & Logs
           </h3>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-cat-surface0 text-cat-subtext hover:text-cat-text transition cursor-pointer"
+            className="p-1.5 rounded-full hover:bg-zinc-100 text-zinc-400 transition cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -315,17 +302,17 @@ export default function SettingsDrawer({
         {/* Account Selector Section */}
         <div className="space-y-4 mb-6">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black text-cat-subtext uppercase tracking-widest">
-              Ganti Akun Transaksi
+            <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
+              Switch Active Portfolio
             </span>
             <button
               onClick={() => {
                 onClose();
                 onOpenAccountModal(null);
               }}
-              className="text-[10px] font-black text-cat-peach hover:underline transition flex items-center gap-1 cursor-pointer"
+              className="text-[9px] font-bold text-zinc-950 hover:underline transition flex items-center gap-1 cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5" /> TAMBAH BARU
+              <Plus className="h-3.5 w-3.5 shrink-0" /> ADD NEW
             </button>
           </div>
 
@@ -333,10 +320,10 @@ export default function SettingsDrawer({
             {accounts.map(acc => (
               <div
                 key={acc.id}
-                className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${
                   activeAccountId === acc.id
-                    ? 'bg-cat-lavender/10 border-cat-lavender text-cat-lavender font-bold shadow-sm'
-                    : 'bg-cat-base border-cat-surface0 hover:border-cat-surface1 text-cat-text'
+                    ? 'bg-zinc-100/80 text-zinc-950 font-bold shadow-xs'
+                    : 'bg-zinc-50/50 hover:bg-zinc-100/50 text-zinc-500'
                 }`}
               >
                 <button
@@ -348,23 +335,23 @@ export default function SettingsDrawer({
                 >
                   <span className="text-sm shrink-0">💼</span>
                   <div className="overflow-hidden">
-                    <h4 className="text-xs font-black truncate max-w-[140px] uppercase tracking-wide">
+                    <h4 className="text-xs font-bold truncate max-w-[140px] uppercase tracking-wide">
                       {acc.name}
                     </h4>
-                    <p className="text-[9px] text-cat-subtext font-mono">
+                    <p className="text-[9px] text-zinc-400 font-mono font-bold">
                       {acc.broker || 'Default'} • {acc.currency}
                     </p>
                   </div>
                 </button>
 
-                <div className="flex items-center gap-1.5 ml-2 border-l border-cat-surface1 pl-2.5">
+                <div className="flex items-center gap-1.5 ml-2 border-l border-zinc-200 pl-2.5">
                   <button
                     onClick={() => {
                       onClose();
                       onOpenAccountModal(acc);
                     }}
-                    title="Ubah info akun"
-                    className="p-1 hover:bg-cat-surface0 rounded-lg text-[10px] cursor-pointer"
+                    title="Edit account settings"
+                    className="p-1 hover:bg-zinc-200/55 rounded-lg text-[10px] cursor-pointer"
                   >
                     ✏️
                   </button>
@@ -372,8 +359,8 @@ export default function SettingsDrawer({
                     onClick={() => {
                       onDeleteAccount(acc.id);
                     }}
-                    title="Hapus akun"
-                    className="p-1 hover:bg-cat-red/10 rounded-lg text-cat-red cursor-pointer"
+                    title="Delete account"
+                    className="p-1 hover:bg-red-50 rounded-lg text-red-500 cursor-pointer"
                   >
                     🗑️
                   </button>
@@ -385,31 +372,31 @@ export default function SettingsDrawer({
 
         {/* Selected Account Info */}
         {activeAccount && (
-          <div className="bg-cat-base border border-cat-surface0 rounded-2xl p-4 mb-6 space-y-2.5">
-            <span className="text-[9px] font-black text-cat-subtext uppercase tracking-widest block mb-1">
-              Data Akun Terpilih
+          <div className="bg-zinc-50/60 rounded-xl p-4 mb-6 space-y-2.5">
+            <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">
+              Active Configuration
             </span>
             <div className="grid grid-cols-2 gap-3 text-[10px]">
               <div className="space-y-0.5">
-                <span className="text-cat-subtext block uppercase font-bold text-[8px]">Broker:</span>
-                <span className="text-cat-text font-black">{activeAccount.broker || '-'}</span>
+                <span className="text-zinc-400 block uppercase font-bold text-[8px]">Broker:</span>
+                <span className="text-zinc-800 font-bold">{activeAccount.broker || '-'}</span>
               </div>
               <div className="space-y-0.5">
-                <span className="text-cat-subtext block uppercase font-bold text-[8px]">Mata Uang:</span>
-                <span className="text-cat-text font-black font-mono">{activeAccount.currency || '-'}</span>
+                <span className="text-zinc-400 block uppercase font-bold text-[8px]">Currency:</span>
+                <span className="text-zinc-800 font-bold font-mono">{activeAccount.currency || '-'}</span>
               </div>
               <div className="space-y-0.5 mt-0.5">
-                <span className="text-cat-subtext block uppercase font-bold text-[8px]">Tipe Portofolio:</span>
-                <span className="text-cat-mauve font-black block">{activeAccount.type || 'STANDARD'}</span>
+                <span className="text-zinc-400 block uppercase font-bold text-[8px]">Type:</span>
+                <span className="text-zinc-800 font-bold block">{activeAccount.type || 'STANDARD'}</span>
               </div>
               <div className="space-y-0.5 mt-0.5">
-                <span className="text-cat-subtext block uppercase font-bold text-[8px]">Leverage:</span>
-                <span className="text-cat-text font-black font-mono">{activeAccount.leverage || '-'}</span>
+                <span className="text-zinc-400 block uppercase font-bold text-[8px]">Max Leverage:</span>
+                <span className="text-zinc-800 font-bold font-mono">{activeAccount.leverage || '-'}</span>
               </div>
               {activeAccount.description && (
-                <div className="space-y-0.5 col-span-2 border-t border-cat-surface0 pt-2.5 mt-1.5">
-                  <span className="text-cat-subtext block uppercase font-bold text-[8px]">Catatan / Trading Plan:</span>
-                  <p className="text-cat-text italic text-[10px] leading-relaxed font-semibold">
+                <div className="space-y-0.5 col-span-2 pt-2.5 mt-1.5 border-t border-zinc-200/60">
+                  <span className="text-zinc-400 block uppercase font-bold text-[8px]">Session Rules / Plan:</span>
+                  <p className="text-zinc-600 italic text-[10px] leading-relaxed font-medium">
                     "{activeAccount.description}"
                   </p>
                 </div>
@@ -419,9 +406,9 @@ export default function SettingsDrawer({
         )}
 
         {/* Pro Operations Panel */}
-        <div className="border-t border-cat-surface1 pt-4 space-y-3.5 text-left font-sans">
-          <span className="text-[9px] font-black text-cat-subtext uppercase tracking-widest block">
-            Pengaturan Jurnal & Trading Pair
+        <div className="pt-4 space-y-2.5 font-sans">
+          <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-wider block">
+            Journal & Assets Actions
           </span>
 
           <button
@@ -429,41 +416,39 @@ export default function SettingsDrawer({
               onClose();
               onOpenPairsModal();
             }}
-            className="w-full bg-cat-lavender/10 hover:bg-cat-lavender/25 border border-cat-lavender/30 text-cat-lavender text-xs font-black py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-widest text-[9px] select-none shadow-sm"
+            className="w-full bg-zinc-950 text-white text-[10px] font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider text-[9px] select-none"
           >
-            <Coins className="h-3.5 w-3.5" /> Kelola Daftar Trading Pair
+            Manage Trading Symbols
+          </button>
+
+          <button
+            onClick={() => {
+              onClose();
+              onOpenImportModal();
+            }}
+            className="w-full bg-zinc-950 text-white text-[10px] font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider text-[9px] select-none"
+          >
+            Import Trade Journal (Excel/CSV)
           </button>
 
           {activeAccount && stats && (
             <button
               onClick={handleExportPDF}
-              className="w-full bg-cat-peach hover:bg-cat-yellow text-cat-crust text-xs font-black py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-widest text-[9px] shadow-md shadow-cat-peach/10 select-none"
+              className="w-full bg-zinc-950 text-white text-[10px] font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider text-[9px] select-none"
             >
-              <FileText className="h-3.5 w-3.5" /> Ekspor Ringkasan Jurnal (PDF)
+              Export Report Summary (PDF)
             </button>
           )}
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              onClick={() => {
-                onClose();
-                onLogout();
-              }}
-              className="w-full bg-cat-surface0 hover:bg-cat-surface1 text-cat-text text-xs font-black py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider text-[10px]"
-            >
-              <LogOut className="h-4 w-4 text-cat-red" /> Log Out
-            </button>
-
-            <button
-              onClick={() => {
-                onClose();
-                onClearAllData();
-              }}
-              className="w-full bg-cat-red/15 hover:bg-cat-red/25 border border-cat-red/20 text-cat-red text-xs font-black py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider text-[10px]"
-            >
-              <Trash2 className="h-4 w-4" /> Reset Jurnal
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              onClose();
+              onClearAllData();
+            }}
+            className="w-full bg-red-600 text-white text-[10px] font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase tracking-wider text-[9px] select-none"
+          >
+            Wipe Portfolio Database
+          </button>
         </div>
       </motion.div>
     </div>

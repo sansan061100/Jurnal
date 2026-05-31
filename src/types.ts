@@ -49,7 +49,6 @@ export interface Trade {
   entryDate: string;  // ISO format or date-time string YYYY-MM-DDTHH:mm
   exitDate: string;
   session: TradeSession;
-  strategy: string;
   notes: string;
   rrRatio?: number;    // Setup planned risk-reward
   rMultiple?: number;  // Realized R multiple

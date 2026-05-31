@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Calculator, Settings, Plus, Trash2, HelpCircle, RefreshCw } from 'lucide-react';
+import { motion } from 'motion/react';
+import { X, Calculator } from 'lucide-react';
 import { Account, Trade, TradeAction, TradeSession, TradingPair } from '../types';
 import { detectTradingSession } from '../utils';
 
@@ -25,7 +25,6 @@ interface TradeModalProps {
     entryDate: string;
     exitDate: string;
     session: TradeSession;
-    strategy: string;
     notes: string;
     rrRatio?: number;
     rMultiple?: number;
@@ -39,12 +38,11 @@ export default function TradeModal({
   activeAccountId,
   editingTrade,
   customPairs,
-  onSavePairs,
-  onSave
+  onSave: onSave
 }: TradeModalProps) {
-  // Real-time live price state
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
+  const [isManualPnl, setIsManualPnl] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -70,7 +68,6 @@ export default function TradeModal({
     entryDate: '',
     exitDate: '',
     session: 'London' as TradeSession,
-    strategy: 'Order Block SMC',
     notes: '',
     rrRatio: 0,
     rMultiple: 0
@@ -84,23 +81,20 @@ export default function TradeModal({
       const cleanPair = targetPair.toUpperCase().replace(/[^A-Z0-9]/g, '');
       let price: number | null = null;
 
-      // 0. Dedicated Gold (XAUUSD / GOLD) fetches for ultimate reliability!
+      // Gold fetches
       if (cleanPair === 'XAUUSD' || cleanPair === 'GOLD') {
-        // Source A: Try Binance PAXGUSDT which tracks XAUUSD extremely accurately 24/7 with zero CORS and zero downtime
         try {
           const binanceRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT');
           if (binanceRes.ok) {
             const bData = await binanceRes.json();
             if (bData && bData.price) {
               price = parseFloat(parseFloat(bData.price).toFixed(2));
-              console.log('Fetched Gold price from PAXGUSDT:', price);
             }
           }
         } catch (err) {
-          console.warn('PAXGUSDT sync failed, trying next gold source...', err);
+          console.warn('PAXGUSDT fetch warning, trying exchange...', err);
         }
 
-        // Source B: Try free Gold API (api.gold-api.com/v1/gold)
         if (price === null) {
           try {
             const goldRes = await fetch('https://api.gold-api.com/v1/gold');
@@ -108,16 +102,15 @@ export default function TradeModal({
               const gData = await goldRes.json();
               if (gData && gData.price) {
                 price = parseFloat(parseFloat(gData.price).toFixed(2));
-                console.log('Fetched Gold price from gold-api:', price);
               }
             }
           } catch (err) {
-            console.warn('Gold API sync failed, trying next source...', err);
+            console.warn('Gold API backup warning...', err);
           }
         }
       }
 
-      // Dedicated Silver (XAGUSD / SILVER / XAG) fetches for ultimate reliability!
+      // Silver fetches
       if (cleanPair === 'XAGUSD' || cleanPair === 'XAG' || cleanPair === 'SILVER') {
         try {
           const res = await fetch('https://open.er-api.com/v6/latest/USD');
@@ -126,31 +119,14 @@ export default function TradeModal({
             const rates = data?.rates;
             if (rates && rates['XAG']) {
               price = parseFloat((1 / parseFloat(rates['XAG'])).toFixed(3));
-              console.log('Fetched Silver price from ExchangeRate-API:', price);
             }
           }
         } catch (err) {
-          console.warn('Silver ExchangeRate-API sync failed, trying fallback...', err);
-        }
-
-        if (price === null) {
-          try {
-            const res = await fetch('https://api.coinbase.com/v2/exchange-rates?currency=USD');
-            if (res.ok) {
-              const data = await res.json();
-              const rates = data?.data?.rates;
-              if (rates && rates['XAG']) {
-                price = parseFloat((1 / parseFloat(rates['XAG'])).toFixed(3));
-                console.log('Fetched Silver price from Coinbase:', price);
-              }
-            }
-          } catch (err) {
-            console.warn('Silver Coinbase sync failed...', err);
-          }
+          console.warn('Silver ExchangeRate fallback warning...', err);
         }
       }
 
-      // 1. If it's a crypto pair (BTCUSD, ETHUSD, etc.), try Binance public ticker API first!
+      // Cryptos
       const isCrypto = cleanPair.startsWith('BTC') || cleanPair.startsWith('ETH') || cleanPair.startsWith('SOL') || cleanPair.startsWith('BNB') || cleanPair.startsWith('DOGE') || cleanPair.startsWith('XRP');
       if (isCrypto) {
         try {
@@ -168,7 +144,7 @@ export default function TradeModal({
         }
       }
 
-      // 2. Try ExchangeRate-API (open.er-api.com) as primary source for Forex & Metals!
+      // Forex and Metals
       if (price === null) {
         try {
           const res = await fetch('https://open.er-api.com/v6/latest/USD');
@@ -176,7 +152,6 @@ export default function TradeModal({
             const data = await res.json();
             const rates = data?.rates;
             if (rates) {
-              // Case 1: Standard 6-letter currency pairs (e.g. EURUSD, GBPJPY)
               if (cleanPair.length === 6) {
                 const base = cleanPair.substring(0, 3);
                 const quote = cleanPair.substring(3, 6);
@@ -192,52 +167,22 @@ export default function TradeModal({
                 }
               }
 
-              // Case 2: Special Gold Commodities (XAUUSD)
               if (price === null && (cleanPair === 'XAUUSD' || cleanPair === 'GOLD')) {
                 const xau = rates['XAU'];
-                if (xau) {
-                  price = parseFloat((1 / parseFloat(xau)).toFixed(2));
-                }
+                if (xau) price = parseFloat((1 / parseFloat(xau)).toFixed(2));
               }
 
-              // Case 3: Directly mapped symbols
               if (price === null && rates[cleanPair]) {
                 price = parseFloat((1 / parseFloat(rates[cleanPair])).toFixed(5));
-              }
-
-              // Case 4: Crypto backup
-              if (price === null && cleanPair.endsWith('USD')) {
-                const baseCrypto = cleanPair.replace('USD', '');
-                if (rates[baseCrypto]) {
-                  price = parseFloat((1 / parseFloat(rates[baseCrypto])).toFixed(5));
-                }
-              }
-
-              // Case 5: Generic matching for any custom-added pair containing USD/USDT
-              if (price === null) {
-                for (const key of Object.keys(rates)) {
-                  if (key.length >= 3 && cleanPair.includes(key)) {
-                    const rateVal = parseFloat(rates[key]);
-                    if (rateVal > 0) {
-                      if (cleanPair.endsWith('USD') || cleanPair.endsWith('USDT')) {
-                        price = parseFloat((1 / rateVal).toFixed(5));
-                        break;
-                      } else if (cleanPair.startsWith('USD')) {
-                        price = parseFloat(rateVal.toFixed(5));
-                        break;
-                      }
-                    }
-                  }
-                }
               }
             }
           }
         } catch (erApiErr) {
-          console.warn('ExchangeRate-API fetch failed, falling back...', erApiErr);
+          console.warn('ExchangeRate-API warning...', erApiErr);
         }
       }
 
-      // 3. Fallback to Coinbase API
+      // Coinbase API
       if (price === null) {
         try {
           const res = await fetch('https://api.coinbase.com/v2/exchange-rates?currency=USD');
@@ -259,69 +204,25 @@ export default function TradeModal({
                   price = parseFloat((rateQuote / rateBase).toFixed(5));
                 }
               }
-
-              if (price === null && rates[cleanPair]) {
-                price = parseFloat((1 / parseFloat(rates[cleanPair])).toFixed(5));
-              }
-
-              if (price === null && cleanPair.endsWith('USD')) {
-                const baseCrypto = cleanPair.replace('USD', '');
-                if (rates[baseCrypto]) {
-                  price = parseFloat((1 / parseFloat(rates[baseCrypto])).toFixed(5));
-                }
-              }
-
-              if (price === null && (cleanPair === 'XAUUSD' || cleanPair === 'GOLD')) {
-                const xau = rates['XAU'] || rates['XAUUSD'];
-                if (xau) {
-                  price = parseFloat((1 / parseFloat(xau)).toFixed(2));
-                }
-              }
-
-              if (price === null && (cleanPair === 'XAGUSD' || cleanPair === 'XAG' || cleanPair === 'SILVER')) {
-                const xag = rates['XAG'] || rates['XAGUSD'] || rates['SILVER'];
-                if (xag) {
-                  price = parseFloat((1 / parseFloat(xag)).toFixed(3));
-                }
-              }
-
-              // Generic matching for custom-added pairs containing USD/USDT on Coinbase rates
-              if (price === null) {
-                for (const key of Object.keys(rates)) {
-                  if (key.length >= 3 && cleanPair.includes(key)) {
-                    const rateVal = parseFloat(rates[key]);
-                    if (rateVal > 0) {
-                      if (cleanPair.endsWith('USD') || cleanPair.endsWith('USDT')) {
-                        price = parseFloat((1 / rateVal).toFixed(5));
-                        break;
-                      } else if (cleanPair.startsWith('USD')) {
-                        price = parseFloat(rateVal.toFixed(5));
-                        break;
-                      }
-                    }
-                  }
-                }
-              }
             }
           }
         } catch (coinbaseErr) {
-          console.warn('Coinbase API fetch failed...', coinbaseErr);
+          console.warn('Coinbase API fallback warning...', coinbaseErr);
         }
       }
 
-      // Fallback estimate for Stock Market Indices (NAS100 / US30) if still null
+      // Indices
       if (price === null) {
         if (cleanPair === 'NAS100') {
-          price = 18550.00; // standard fallback approximate
+          price = 18550.00;
         } else if (cleanPair === 'US30') {
-          price = 39100.00; // standard fallback approximate
+          price = 39100.00;
         }
       }
 
       if (price !== null) {
         setLivePrice(price);
         
-        // Auto update prices during creation of *new* trades only
         if (!editingTrade) {
           setForm(prev => {
             const distance = targetPair === 'XAUUSD' ? 5.0 : (cleanPair.includes('JPY') ? 0.30 : (cleanPair.includes('USD') && !cleanPair.startsWith('BTC') && !cleanPair.startsWith('ETH') ? 0.0020 : 0));
@@ -361,9 +262,22 @@ export default function TradeModal({
     }
   }, [form.pair, isOpen]);
 
-  // Calculate default entry dates (UTC 2026-05-20/21)
+  // Setup form values
   useEffect(() => {
     if (editingTrade) {
+      const selectedPair = customPairs.find(p => p.alias === editingTrade.pair) || { contractSize: 100000 };
+      const contract = selectedPair.contractSize;
+      let calculatedPnl = 0;
+      if (editingTrade.action === 'BUY') {
+        calculatedPnl = (editingTrade.exitPrice - editingTrade.entryPrice) * editingTrade.lotSize * contract;
+      } else {
+        calculatedPnl = (editingTrade.entryPrice - editingTrade.exitPrice) * editingTrade.lotSize * contract;
+      }
+      calculatedPnl = parseFloat(calculatedPnl.toFixed(2));
+      
+      const isCustomPnl = Math.abs(editingTrade.pnl - calculatedPnl) > 0.05;
+      setIsManualPnl(isCustomPnl);
+
       setForm({
         accountId: editingTrade.accountId,
         pair: editingTrade.pair,
@@ -374,16 +288,16 @@ export default function TradeModal({
         takeProfit: editingTrade.takeProfit !== undefined ? editingTrade.takeProfit : '',
         exitPrice: editingTrade.exitPrice,
         pnl: editingTrade.pnl,
-        entryDate: editingTrade.entryDate,
-        exitDate: editingTrade.exitDate,
+        entryDate: editingTrade.entryDate ? editingTrade.entryDate.substring(0, 10) : '',
+        exitDate: editingTrade.exitDate ? editingTrade.exitDate.substring(0, 10) : '',
         session: editingTrade.session,
-        strategy: editingTrade.strategy,
         notes: editingTrade.notes || '',
         rrRatio: editingTrade.rrRatio || 0,
         rMultiple: editingTrade.rMultiple || 0
       });
     } else {
-      const defaultDate = '2026-05-21T10:00';
+      setIsManualPnl(false);
+      const defaultDate = '2026-05-21';
       const initialAccountId = activeAccountId && activeAccountId !== 'all_accounts' 
         ? activeAccountId 
         : (accounts[0]?.id || '');
@@ -401,7 +315,6 @@ export default function TradeModal({
         entryDate: defaultDate,
         exitDate: defaultDate,
         session: 'London',
-        strategy: 'Order Block SMC',
         notes: '',
         rrRatio: 3.0,
         rMultiple: 1.0
@@ -423,6 +336,8 @@ export default function TradeModal({
     }
     calculatedPnl = parseFloat(calculatedPnl.toFixed(2));
 
+    const activePnl = isManualPnl ? Number(form.pnl) || 0 : calculatedPnl;
+
     // 2. Calculate Setup Risk Reward (Target RR)
     let calculatedRr = 0;
     const numSl = Number(form.stopLoss);
@@ -442,27 +357,28 @@ export default function TradeModal({
       if (riskPerUnit > 0) {
         const riskAmount = riskPerUnit * form.lotSize * contract;
         if (riskAmount > 0) {
-          calculatedRMultiple = parseFloat((calculatedPnl / riskAmount).toFixed(2));
+          calculatedRMultiple = parseFloat((activePnl / riskAmount).toFixed(2));
         }
       }
     }
 
     setForm(prev => {
+      const targetPnl = isManualPnl ? prev.pnl : calculatedPnl;
       if (
-        prev.pnl !== calculatedPnl ||
+        prev.pnl !== targetPnl ||
         prev.rrRatio !== calculatedRr ||
         prev.rMultiple !== calculatedRMultiple
       ) {
         return {
           ...prev,
-          pnl: calculatedPnl,
+          pnl: targetPnl,
           rrRatio: calculatedRr,
           rMultiple: calculatedRMultiple
         };
       }
       return prev;
     });
-  }, [form.pair, form.action, form.lotSize, form.entryPrice, form.exitPrice, form.stopLoss, form.takeProfit, customPairs]);
+  }, [form.pair, form.action, form.lotSize, form.entryPrice, form.exitPrice, form.stopLoss, form.takeProfit, customPairs, isManualPnl, form.pnl]);
 
   // Auto detect session on Entry Date change
   const handleEntryDateChange = (dateStr: string) => {
@@ -470,6 +386,7 @@ export default function TradeModal({
     setForm(prev => ({
       ...prev,
       entryDate: dateStr,
+      exitDate: dateStr,
       session: session
     }));
   };
@@ -478,18 +395,17 @@ export default function TradeModal({
     e.preventDefault();
     if (isSavingRef.current || isSaving) return;
     if (!form.accountId) {
-      alert('Silakan pilih akun trading terlebih dahulu!');
+      alert('Please select a trading account first!');
       return;
     }
     if (!form.pair) {
-      alert('Pair / Symbol wajib diisi!');
+      alert('Symbol/Pair is required!');
       return;
     }
 
     isSavingRef.current = true;
     setIsSaving(true);
 
-    // Prepare clean parameters to pass upwards
     const slVal = form.stopLoss !== '' ? Number(form.stopLoss) : undefined;
     const tpVal = form.takeProfit !== '' ? Number(form.takeProfit) : undefined;
 
@@ -509,13 +425,15 @@ export default function TradeModal({
 
   if (!isOpen) return null;
 
-  // Derive extra details
   const selectedPairObj = customPairs.find(p => p.alias === form.pair) || { id: 'fallback', alias: form.pair || 'EURUSD', name: 'Standard Forex', contractSize: 100000 };
   const currentMultiplier = selectedPairObj.contractSize;
   const unitRisk = form.stopLoss !== '' ? Math.abs(form.entryPrice - Number(form.stopLoss)) : 0;
   const cashRisk = unitRisk * form.lotSize * currentMultiplier;
   const unitReward = form.takeProfit !== '' ? Math.abs(Number(form.takeProfit) - form.entryPrice) : 0;
   const cashReward = unitReward * form.lotSize * currentMultiplier;
+  
+  const selectedAccount = accounts.find(acc => acc.id === form.accountId) || accounts[0];
+  const activeCurrency = selectedAccount?.currency || 'USD';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -533,18 +451,18 @@ export default function TradeModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-cat-mantle border border-cat-surface1 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-50 flex flex-col max-h-[92vh]"
+        className="bg-cat-mantle border-2 border-cat-surface0 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-50 flex flex-col max-h-[92vh] select-none"
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-cat-surface0 flex items-center justify-between bg-cat-base/30">
-          <h3 className="text-sm font-bold text-cat-text flex items-center gap-2">
+        <div className="px-6 py-4 flex items-center justify-between border-b-2 border-cat-surface0">
+          <h3 className="text-sm font-black text-cat-text flex items-center gap-2 uppercase tracking-wider">
             <Calculator className="h-4.5 w-4.5 text-cat-lavender" />
-            {editingTrade ? 'Ubah Jurnal Transaksi' : 'Catat Transaksi Professional'}
+            {editingTrade ? 'Edit Trade Log' : 'Create Trade Log'}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-cat-surface0 text-cat-subtext transition-all cursor-pointer"
+            className="p-1.5 rounded-full hover:bg-cat-surface0 text-cat-subtext transition-all cursor-pointer border border-transparent"
           >
             <X className="h-4 w-4" />
           </button>
@@ -556,367 +474,361 @@ export default function TradeModal({
             onSubmit={handleSubmit}
             className="space-y-4"
           >
-            {/* Account selector inside Modal */}
+            {/* Account Selector */}
             <div>
-              <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                    Akun Trading *
-                  </label>
-                  <select
-                    value={form.accountId}
-                    onChange={e => setForm(prev => ({ ...prev, accountId: e.target.value }))}
-                    required
-                    className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none transition-all cursor-pointer font-bold"
+              <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                Trading Account *
+              </label>
+              <select
+                value={form.accountId}
+                onChange={e => setForm(prev => ({ ...prev, accountId: e.target.value }))}
+                required
+                className="w-full text-xs p-3 font-bold cursor-pointer"
+              >
+                <option value="" disabled>--- Select Account ---</option>
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>
+                    💼 {acc.name} ({acc.currency})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Pair & Action */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Pair selection */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Symbol / Pair *
+                </label>
+                <select
+                  value={form.pair}
+                  onChange={e => setForm(prev => ({ ...prev, pair: e.target.value }))}
+                  className="w-full text-xs p-3 font-mono font-bold cursor-pointer"
+                >
+                  {customPairs.map(p => (
+                    <option key={p.alias} value={p.alias}>{p.alias} ({p.name})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Action */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Order Action *
+                </label>
+                <div className="grid grid-cols-2 gap-1 bg-cat-base p-1 border-2 border-cat-surface0 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, action: 'BUY' }))}
+                    className={`py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      form.action === 'BUY'
+                        ? 'bg-cat-green text-cat-base shadow-sm'
+                        : 'text-cat-subtext hover:text-cat-text'
+                    }`}
                   >
-                    <option value="" disabled>--- Pilih Akun ---</option>
-                    {accounts.map(acc => (
-                      <option key={acc.id} value={acc.id}>
-                        💼 {acc.name} ({acc.currency})
-                      </option>
-                    ))}
-                  </select>
+                    BUY
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, action: 'SELL' }))}
+                    className={`py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      form.action === 'SELL'
+                        ? 'bg-cat-red text-cat-base shadow-sm'
+                        : 'text-cat-subtext hover:text-cat-text'
+                    }`}
+                  >
+                    SELL
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Entry Price & Lot Size */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Entry Price */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Entry Price *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={form.entryPrice}
+                  onChange={e => setForm(prev => ({ ...prev, entryPrice: Number(e.target.value) }))}
+                  className="w-full text-xs p-3 font-mono font-black"
+                />
+              </div>
+
+              {/* Lot Size */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Lot Size *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0.001"
+                  required
+                  value={form.lotSize}
+                  onChange={e => setForm(prev => ({ ...prev, lotSize: Number(e.target.value) }))}
+                  className="w-full text-xs p-3 font-mono font-black"
+                />
+              </div>
+            </div>
+
+            {/* Stop Loss & Take Profit */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Stop Loss */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Stop Loss (SL) *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  placeholder="Stop loss value"
+                  value={form.stopLoss}
+                  onChange={e => setForm(prev => ({ ...prev, stopLoss: e.target.value }))}
+                  className="w-full text-xs p-3 font-mono font-black text-cat-red"
+                />
+              </div>
+
+              {/* Take Profit */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Take Profit (TP) *
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  placeholder="Take profit target"
+                  value={form.takeProfit}
+                  onChange={e => setForm(prev => ({ ...prev, takeProfit: e.target.value }))}
+                  className="w-full text-xs p-3 font-mono font-black text-cat-green"
+                />
+              </div>
+            </div>
+
+            {/* Exit Price */}
+            <div>
+              <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                Exit Price / Close *
+              </label>
+              <input
+                type="number"
+                step="any"
+                required
+                value={form.exitPrice}
+                onChange={e => setForm(prev => ({ ...prev, exitPrice: Number(e.target.value) }))}
+                className="w-full text-xs p-3 font-mono font-black"
+              />
+            </div>
+
+            {/* Risk Engine Automatic Calculated Metrics */}
+            <div className="bg-cat-base/30 border-2 border-cat-surface0 p-4 rounded-2xl space-y-3.5">
+              <div className="text-[10px] font-black text-cat-lavender uppercase tracking-widest flex items-center justify-between pb-2 border-b border-cat-surface0/30">
+                <span>⚡ RISK ENGINE</span>
+                <span className="bg-cat-surface0 px-1.5 py-0.5 rounded text-[8px] text-cat-subtext font-mono font-bold">
+                  Multiplier: {selectedPairObj.alias} x{currentMultiplier}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs font-medium">
+                {/* Planned Risk */}
+                <div className="bg-cat-mantle border border-cat-surface0/50 p-2.5 rounded-xl flex flex-col">
+                  <span className="text-[9px] text-cat-subtext font-black uppercase mb-0.5">ESTIMATED RISK (1R)</span>
+                  <span className="text-cat-red font-mono font-black text-xs">
+                    {formatCurrencyExact(-cashRisk, activeCurrency)}
+                  </span>
+                  <span className="text-[8px] text-cat-subtext mt-0.5 font-mono">
+                    ({unitRisk.toFixed(5)} units)
+                  </span>
                 </div>
 
-                {/* Pair & Action (Side-by-side) */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Pair selection */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider flex items-center justify-between">
-                      <span>Pair / Symbol *</span>
-                      {isLivePriceLoading && (
-                        <span className="text-[9px] text-cat-lavender animate-pulse font-mono lowercase tracking-normal">memuat rate...</span>
-                      )}
-                    </label>
-                    <select
-                      value={form.pair}
-                      onChange={e => setForm(prev => ({ ...prev, pair: e.target.value }))}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none transition-all font-mono font-bold cursor-pointer"
-                    >
-                      {customPairs.map(p => (
-                        <option key={p.alias} value={p.alias}>{p.alias} ({p.name})</option>
-                      ))}
-                    </select>
-
-                    {/* Live Price Feedback Area */}
-                    <div className="mt-1.5 flex items-center justify-between px-1">
-                      {livePrice !== null ? (
-                        <div className="flex items-center gap-1.5 select-none">
-                          <span className="inline-flex w-1.5 h-1.5 rounded-full bg-cat-green animate-ping" />
-                          <span className="text-[10px] font-mono font-extrabold text-cat-green">
-                            Live: {livePrice.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
-                          </span>
-                        </div>
-                      ) : livePriceFetchError ? (
-                        <span className="text-[10px] font-bold text-cat-red select-none">⚠️ Gagal sync live</span>
-                      ) : (
-                        <span className="text-[10px] text-cat-overlay2 font-medium select-none anim-pulse">Lacak live...</span>
-                      )}
-                      
-                      <button
-                        type="button"
-                        onClick={() => fetchLivePriceForPair(form.pair)}
-                        disabled={isLivePriceLoading}
-                        className="text-[9px] font-black uppercase text-cat-peach hover:text-cat-yellow transition-all flex items-center gap-1 cursor-pointer select-none"
-                      >
-                        <RefreshCw className={`h-2.5 w-2.5 ${isLivePriceLoading ? 'animate-spin' : ''}`} />
-                        Sync Manual
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Action */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                      Tipe Eksekusi *
-                    </label>
-                    <div className="grid grid-cols-2 gap-1 bg-cat-base p-1 rounded-xl border border-cat-surface1">
-                      <button
-                        type="button"
-                        onClick={() => setForm(prev => ({ ...prev, action: 'BUY' }))}
-                        className={`py-2 rounded-lg text-xs font-black transition-all ${
-                          form.action === 'BUY'
-                            ? 'bg-cat-green text-cat-crust shadow-sm shadow-cat-green/10'
-                            : 'text-cat-subtext hover:text-cat-text'
-                        }`}
-                      >
-                        BUY
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setForm(prev => ({ ...prev, action: 'SELL' }))}
-                        className={`py-2 rounded-lg text-xs font-black transition-all ${
-                          form.action === 'SELL'
-                            ? 'bg-cat-red text-cat-crust shadow-sm shadow-cat-red/10'
-                            : 'text-cat-subtext hover:text-cat-text'
-                        }`}
-                      >
-                        SELL
-                      </button>
-                    </div>
-                  </div>
+                {/* Planned Reward */}
+                <div className="bg-cat-mantle border border-cat-surface0/50 p-2.5 rounded-xl flex flex-col">
+                  <span className="text-[9px] text-cat-subtext font-black uppercase mb-0.5">TARGET ESTIMATE</span>
+                  <span className="text-cat-green font-mono font-black text-xs">
+                    +{formatCurrencyExact(cashReward, activeCurrency)}
+                  </span>
+                  <span className="text-[8px] text-cat-subtext mt-0.5 font-mono">
+                    ({unitReward.toFixed(5)} units)
+                  </span>
                 </div>
 
-                {/* Entry Price & Lot Size */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Entry Price */}
+                {/* RR Setup Ratio */}
+                <div className="bg-cat-mantle border border-cat-surface0/50 p-2.5 rounded-xl flex items-center justify-between">
                   <div>
-                    <div className="flex items-center justify-between mb-1 select-none">
-                      <label className="block text-[10px] font-bold text-cat-subtext uppercase tracking-wider">
-                        Harga Entry *
-                      </label>
-                      {livePrice !== null && (
-                        <button
-                          type="button"
-                          onClick={() => setForm(prev => ({ ...prev, entryPrice: livePrice }))}
-                          className="text-[9px] text-cat-peach hover:text-cat-yellow font-black uppercase tracking-wider"
-                        >
-                          Gunakan Live
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      value={form.entryPrice}
-                      onChange={e => setForm(prev => ({ ...prev, entryPrice: Number(e.target.value) }))}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none font-mono font-bold"
-                    />
-                  </div>
-
-                  {/* Lot Size */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                      Ukuran Lot *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      min="0.001"
-                      required
-                      value={form.lotSize}
-                      onChange={e => setForm(prev => ({ ...prev, lotSize: Number(e.target.value) }))}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none font-mono font-bold"
-                    />
-                  </div>
-                </div>
-
-                {/* Stop Loss & Take Profit */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Stop Loss */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                      Stop Loss (SL) *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      placeholder="Batas Stop Loss"
-                      value={form.stopLoss}
-                      onChange={e => setForm(prev => ({ ...prev, stopLoss: e.target.value }))}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none font-mono font-bold text-cat-red"
-                    />
-                  </div>
-
-                  {/* Take Profit */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                      Take Profit (TP) *
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      placeholder="Target Profit"
-                      value={form.takeProfit}
-                      onChange={e => setForm(prev => ({ ...prev, takeProfit: e.target.value }))}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none font-mono font-bold text-cat-green"
-                    />
+                    <span className="block text-[9px] text-cat-subtext font-black uppercase mb-0.5">EST. RISK RATION (RR)</span>
+                    <span className="font-mono text-cat-lavender font-black">
+                      1 : {form.rrRatio.toFixed(2)}
+                    </span>
                   </div>
                 </div>
 
-                {/* Exit Price */}
-                <div>
-                  <div className="flex items-center justify-between mb-1 select-none">
-                    <label className="block text-[10px] font-bold text-cat-subtext uppercase tracking-wider">
-                      Harga Exit / Tutup Posisi *
-                    </label>
-                    {livePrice !== null && (
-                      <button
-                        type="button"
-                        onClick={() => setForm(prev => ({ ...prev, exitPrice: livePrice }))}
-                        className="text-[9px] text-cat-peach hover:text-cat-yellow font-black uppercase tracking-wider"
-                      >
-                        Gunakan Live
-                      </button>
-                    )}
+                {/* Realized R Multiple */}
+                <div className="bg-cat-mantle border border-cat-surface0/50 p-2.5 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="block text-[9px] text-cat-subtext font-black uppercase mb-0.5">REALIZED R VALUE</span>
+                    <span className={`font-mono font-black ${form.rMultiple >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
+                      {form.rMultiple >= 0 ? '+' : ''}{form.rMultiple.toFixed(2)} R
+                    </span>
                   </div>
+                </div>
+              </div>
+
+              {/* Calculated PNL Output Display & Manual Input Override */}
+              <div className="p-3.5 bg-cat-mantle border border-cat-surface0 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black text-cat-text uppercase tracking-widest flex items-center gap-1">
+                    💵 Net P&L ({activeCurrency}) :
+                  </span>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!isManualPnl}
+                      onChange={(e) => {
+                        const useAuto = e.target.checked;
+                        setIsManualPnl(!useAuto);
+                        if (useAuto) {
+                          const selectedPair = customPairs.find(p => p.alias === form.pair) || { contractSize: 100000 };
+                          const contract = selectedPair.contractSize;
+                          let calculatedPnl = 0;
+                          if (form.action === 'BUY') {
+                            calculatedPnl = (form.exitPrice - form.entryPrice) * form.lotSize * contract;
+                          } else {
+                            calculatedPnl = (form.entryPrice - form.exitPrice) * form.lotSize * contract;
+                          }
+                          calculatedPnl = parseFloat(calculatedPnl.toFixed(2));
+                          setForm(prev => ({ ...prev, pnl: calculatedPnl }));
+                        }
+                      }}
+                      className="h-3.5 w-3.5 rounded bg-cat-base text-cat-lavender cursor-pointer border-2 border-cat-surface0"
+                    />
+                    <span className="text-[9px] font-black uppercase text-cat-text tracking-wider">
+                      Auto Calculate
+                    </span>
+                  </label>
+                </div>
+
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 font-mono font-black text-[10px] text-cat-subtext">
+                    {activeCurrency}
+                  </span>
                   <input
                     type="number"
                     step="any"
-                    required
-                    value={form.exitPrice}
-                    onChange={e => setForm(prev => ({ ...prev, exitPrice: Number(e.target.value) }))}
-                    className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none font-mono font-bold"
+                    value={form.pnl}
+                    disabled={!isManualPnl}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setForm(prev => ({ ...prev, pnl: isNaN(val) ? 0 : val }));
+                    }}
+                    className={`w-full bg-cat-base text-xs pl-14 pr-16 py-2.5 rounded-xl focus:outline-none font-mono font-black border-2 border-cat-surface0 ${
+                      !isManualPnl 
+                        ? 'text-cat-subtext/60 cursor-not-allowed opacity-80' 
+                        : 'focus:ring-1 focus:ring-cat-lavender'
+                    } ${form.pnl >= 0 ? 'text-cat-green' : 'text-cat-red'}`}
+                    placeholder="0.00"
                   />
+                  <span className="absolute right-3 text-[8px] font-black uppercase text-cat-text tracking-wider">
+                    {!isManualPnl ? 'AUTO' : 'MANUAL'}
+                  </span>
                 </div>
-
-                {/* ================== LIVE ANALYTICS PRO DISPLAY ================== */}
-                <div className="bg-cat-base/70 p-4 rounded-2xl border border-cat-surface0 space-y-3.5">
-                  <div className="text-[10px] font-black text-cat-lavender uppercase tracking-widest flex items-center justify-between border-b border-cat-surface1 pb-2">
-                    <span>⚡ PRO RISK ENGINE (KALKULASI OTOMATIS)</span>
-                    <span className="bg-cat-surface0 px-1.5 py-0.5 rounded text-[9px] text-cat-overlay2 border border-cat-surface1">
-                      Multiplier: {selectedPairObj.alias} x{currentMultiplier}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-xs font-medium">
-                    {/* Planned Risk */}
-                    <div className="bg-cat-mantle/50 p-2.5 rounded-xl border border-cat-surface1/60 flex flex-col">
-                      <span className="text-[10px] text-cat-overlay2 font-bold mb-0.5">RISIKO SETUP (1R)</span>
-                      <span className="text-cat-red font-mono font-black text-xs">
-                        -${cashRisk.toLocaleString('id-ID', { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className="text-[9px] text-cat-subtext mt-0.5 font-mono">
-                        ({unitRisk.toFixed(2)} unit)
-                      </span>
-                    </div>
-
-                    {/* Planned Reward */}
-                    <div className="bg-cat-mantle/50 p-2.5 rounded-xl border border-cat-surface1/60 flex flex-col">
-                      <span className="text-[10px] text-cat-overlay2 font-bold mb-0.5">REWARD TARGET</span>
-                      <span className="text-cat-green font-mono font-black text-xs">
-                        +${cashReward.toLocaleString('id-ID', { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className="text-[9px] text-cat-subtext mt-0.5 font-mono">
-                        ({unitReward.toFixed(2)} unit)
-                      </span>
-                    </div>
-
-                    {/* RR Setup Ratio */}
-                    <div className="bg-cat-mantle/50 p-2.5 rounded-xl border border-cat-surface1/60 flex items-center justify-between">
-                      <div>
-                        <span className="block text-[10px] text-cat-overlay2 font-bold mb-0.5">RR SETUP</span>
-                        <span className="font-mono text-cat-lavender font-black">
-                          1 : {form.rrRatio.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="bg-cat-lavender/10 border border-cat-lavender/20 rounded-lg px-2 py-1 text-[9px] font-bold text-cat-lavender">
-                        Setup RR
-                      </div>
-                    </div>
-
-                    {/* Realized R Multiple */}
-                    <div className="bg-cat-mantle/50 p-2.5 rounded-xl border border-cat-surface1/60 flex items-center justify-between">
-                      <div>
-                        <span className="block text-[10px] text-cat-overlay2 font-bold mb-0.5">PEROLEHAN R</span>
-                        <span className={`font-mono font-black ${form.rMultiple >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
-                          {form.rMultiple >= 0 ? '+' : ''}{form.rMultiple.toFixed(2)} R
-                        </span>
-                      </div>
-                      <div className={`px-2 py-1 rounded-lg text-[9px] font-bold border ${pnlColClass(form.pnl)}`}>
-                        {form.pnl >= 0 ? 'WIN' : 'LOSS'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Calculated PNL Output Display */}
-                  <div className="flex items-center justify-between p-3.5 bg-cat-mantle rounded-xl border border-cat-surface1/90">
-                    <span className="text-[11px] font-black text-cat-text uppercase tracking-wider">Automated Net P&L:</span>
-                    <span className={`text-base font-mono font-black tracking-tight ${form.pnl >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
-                      {form.pnl >= 0 ? '+' : ''}${parseFloat(form.pnl.toFixed(2)).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Entry & Exit Dates */}
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Entry Date */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                      Waktu Entry *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={form.entryDate}
-                      onChange={e => handleEntryDateChange(e.target.value)}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-2.5 rounded-xl focus:border-cat-lavender focus:outline-none font-medium text-center"
-                    />
-                  </div>
-
-                  {/* Exit Date */}
-                  <div>
-                    <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                      Waktu Exit *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={form.exitDate}
-                      onChange={e => setForm(prev => ({ ...prev, exitDate: e.target.value }))}
-                      className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-2.5 rounded-xl focus:border-cat-lavender focus:outline-none font-medium text-center"
-                    />
-                  </div>
-                                {/* Session */}
-                 <div>
-                   <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                     Sesi Trading
-                   </label>
-                   <select
-                     value={form.session}
-                     onChange={e => setForm(prev => ({ ...prev, session: e.target.value as TradeSession }))}
-                     className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-3 rounded-xl focus:border-cat-lavender focus:outline-none transition-all cursor-pointer font-black"
-                   >
-                     <option value="Asian">🇲🇨 Asian Session</option>
-                     <option value="London">🇬🇧 London Session</option>
-                     <option value="New York">🇺🇸 New York Session</option>
-                     <option value="Other">🌍 Other / Weekend</option>
-                   </select>
-                 </div>
-
-                 {/* Notes */}
-                 <div>
-                   <label className="block text-[10px] font-bold text-cat-subtext mb-1 uppercase tracking-wider">
-                     Catatan / Analisa Psikologi Emosi
-                   </label>
-                   <textarea
-                     rows={2.5}
-                     value={form.notes}
-                     onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
-                     placeholder="Kenapa trading ini diambil? Bagaimana kondisi emosional? Hambatan psikologi? (Opsional)"
-                     className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-4 py-3 rounded-xl focus:border-cat-lavender focus:outline-none placeholder:text-cat-surface2 leading-relaxed"
-                   />
-                 </div>
-                </div>
-
-                {/* Submition Actions */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-cat-surface0">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="border border-cat-surface1 hover:bg-cat-surface0 text-cat-subtext hover:text-cat-text font-black px-5 py-3 rounded-xl text-xs transition-all uppercase tracking-wider"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="bg-cat-lavender hover:bg-cat-mau text-cat-crust font-black px-6 py-3 rounded-xl text-xs transition-all shadow-md shadow-cat-lavender/10 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSaving ? 'Menyimpan...' : 'Simpan Jurnal Transaksi'}
-                  </button>
-                </div>
-              </form>
+              </div>
             </div>
-          </motion.div>
+
+            {/* Transaction Date & Session */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Single Date Date */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Transaction Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.entryDate}
+                  onChange={e => handleEntryDateChange(e.target.value)}
+                  className="w-full text-xs p-3 font-black text-center"
+                />
+              </div>
+
+              {/* Session */}
+              <div>
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Trading Session
+                </label>
+                <select
+                  value={form.session}
+                  onChange={e => setForm(prev => ({ ...prev, session: e.target.value as TradeSession }))}
+                  className="w-full text-xs p-3 cursor-pointer font-black"
+                >
+                  <option value="Asian">🇲🇨 Asian Session</option>
+                  <option value="London">🇬🇧 London Session</option>
+                  <option value="New York">🇺🇸 New York Session</option>
+                  <option value="Other">🌍 Other / Weekend</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                Trade Setup Notes / Psychological Remarks
+              </label>
+              <textarea
+                rows={2.5}
+                value={form.notes}
+                onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Declare details, FVG tags, SMC setups, or checklist confirmations..."
+                className="w-full text-xs p-3 leading-relaxed font-bold"
+              />
+            </div>
+
+            {/* Submission Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-cat-surface0/30">
+              <button
+                type="button"
+                onClick={onClose}
+                className="hover:bg-cat-surface0 text-cat-subtext font-black px-5 py-3 rounded-xl text-xs uppercase tracking-wider transition hover:text-cat-text cursor-pointer border border-transparent"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="bg-cat-lavender hover:bg-cat-mau text-cat-base font-black px-6 py-3 rounded-xl text-xs border-2 border-cat-surface0 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:shadow-none active:translate-y-0.5 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+              >
+                {isSaving ? 'Saving...' : 'Save Journal Position'}
+              </button>
+            </div>
+          </form>
         </div>
+      </motion.div>
+    </div>
   );
 }
 
 // Helpers
-function pnlColClass(pnl: number): string {
-  if (pnl > 0.01) return 'bg-cat-green/10 border-cat-green/20 text-cat-green';
-  if (pnl < -0.01) return 'bg-cat-red/10 border-cat-red/20 text-cat-red';
-  return 'bg-cat-subtext/10 border-cat-subtext/20 text-cat-subtext';
+function formatCurrencyExact(value: number, currency: string = 'USD'): string {
+  const isNegative = value < 0;
+  const absValue = Math.abs(value);
+  let prefix = '';
+  if (currency === 'USC') {
+    prefix = '¢';
+  } else if (currency === 'IDR') {
+    prefix = 'Rp';
+  } else {
+    prefix = '$';
+  }
+  const formattedNum = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: currency === 'IDR' ? 0 : 2,
+    maximumFractionDigits: currency === 'IDR' ? 0 : 2,
+  }).format(absValue);
+  return `${isNegative ? '-' : ''}${prefix}${formattedNum}`;
 }

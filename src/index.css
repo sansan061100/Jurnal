@@ -1,298 +1,177 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
-  /* Catppuccin Mocha Color Theme (Pastel) */
-  --color-cat-base: #1e1e2e;
-  --color-cat-mantle: #181825;
-  --color-cat-crust: #11111b;
-  --color-cat-surface0: #313244;
-  --color-cat-surface1: #45475a;
-  --color-cat-surface2: #585b70;
-  --color-cat-text: #cdd6f4;
-  --color-cat-subtext: #a6adc8;
-  --color-cat-lavender: #b4befe;
-  --color-cat-mauve: #cba6f7;
-  --color-cat-pink: #f5c2e7;
-  --color-cat-red: #f38ba8;
-  --color-cat-green: #a6e3a1;
-  --color-cat-peach: #fab387;
-  --color-cat-yellow: #f9e2af;
-  --color-cat-blue: #89b4fa;
-  --color-cat-teal: #94e2d5;
-  --color-cat-rosewater: #f5e0dc;
-  --color-cat-flamingo: #f2cdcd;
+  /* Warm Minimalist base colors with vibrant system accent mappings */
+  --color-cat-base: #ffffff;
+  --color-cat-mantle: #ffffff;
+  --color-cat-crust: #fafafa;
+  --color-cat-surface0: #f4f4f5;
+  --color-cat-surface1: #e4e4e7;
+  --color-cat-surface2: #a1a1aa;
+  --color-cat-text: #09090b;
+  --color-cat-subtext: #71717a;
+  --color-cat-lavender: #4f46e5; /* Vibrant Indigo */
+  --color-cat-mauve: #7c3aed;    /* Violet */
+  --color-cat-pink: #db2777;     /* Rose Pink */
+  --color-cat-red: #da251d;      /* Solid Crimson */
+  --color-cat-green: #008a47;    /* Solid Forest Green */
+  --color-cat-peach: #ea580c;    /* Deep Amber Orange */
+  --color-cat-yellow: #ca8a04;   /* Darker Gold Yellow */
+  --color-cat-blue: #2563eb;     /* Vivid Blue */
+  --color-cat-teal: #0d9488;     /* Clean Teal */
+  --color-cat-rosewater: #f43f5e;
+  --color-cat-flamingo: #e11d48;
 }
 
 body {
-  background-color: #11111b; /* Crust */
-  color: #cdd6f4;            /* Text */
+  background-color: #fafafa !important;
+  color: #09090b !important;
   font-family: var(--font-sans);
-  overflow-x: hidden;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow: hidden;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.light {
-  --color-cat-base: #ffffff;
-  --color-cat-mantle: #fffefb; /* warm clean studio paper */
-  --color-cat-crust: #f8f6ed;  /* beautiful eggshell sketch paper background */
-  --color-cat-surface0: #e4e4db; /* soft warm grey line divider */
-  --color-cat-surface1: #d1d1c7; /* darker grey accent */
-  --color-cat-surface2: #828277; /* text labels */
-  --color-cat-text: #1a1a18; /* true readable dark text */
-  --color-cat-subtext: #4a4a44; /* secondary text label */
-  
-  --color-cat-lavender: #6366f1; /* beautiful clean indigo */
-  --color-cat-mauve: #ec4899;    /* vivid pink accent */
-  --color-cat-pink: #f43f5e;
-  --color-cat-red: #ef4444;
-  --color-cat-green: #22c55e;
-  --color-cat-peach: #f97316;
-  --color-cat-yellow: #eab308;
-  --color-cat-blue: #3b82f6;
-  --color-cat-teal: #14b8a6;
-  --color-cat-rosewater: #cbd5e1;
-  --color-cat-flamingo: #fca5a5;
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 9999px;
 }
 
-.light body {
-  background-color: #f8f6ed !important;
-  color: #1a1a18 !important;
+/* Dynamic styling for PNL text colors */
+.text-cat-green {
+  color: #008a47 !important;
+}
+.text-cat-red {
+  color: #da251d !important;
 }
 
-/* Beautiful custom scrollbars for Light Theme */
-.light ::-webkit-scrollbar-track {
-  background: #f1ebd9 !important;
+/* Custom badge stylings (Green for Wins, Red for Losses) without borders */
+.bg-cat-green\/10 {
+  background-color: #e6f7ed !important;
+  color: #008a47 !important;
+  border: none !important;
 }
-.light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1 !important;
-  border-radius: 9999px !important;
-}
-
-/* Adjust light mode theme specifics to look polished and unified */
-.light .bg-cat-surface0 {
-  background-color: #e2e2dd !important;
-  color: #1a1a18 !important;
-}
-.light .bg-cat-surface1 {
-  background-color: #d8d8d3 !important;
-  color: #1a1a18 !important;
-}
-.light .bg-cat-surface2 {
-  background-color: #bfbfb8 !important;
-  color: #1a1a18 !important;
+.bg-cat-red\/10 {
+  background-color: #fdf2f2 !important;
+  color: #da251d !important;
+  border: none !important;
 }
 
-/* Specific styling for passive calendar cells & helper indicators */
-.light .text-cat-text\/30 {
-  color: #9f9f95 !important;
-  font-weight: 600 !important;
-}
-.light .text-cat-subtext {
-  color: #4a4a44 !important;
-}
-
-/* Elegant Calendar cells for Light Theme with soft pastel colors */
-.light .bg-\[\#0c311c\]\/90 {
-  background-color: #d1fae5 !important; /* light green pastel background */
-  color: #065f46 !important; /* deep high-contrast green text */
-  border: 1px solid #a7f3d0 !important;
-}
-.light .bg-\[\#481215\]\/90 {
-  background-color: #fee2e2 !important; /* light red pastel background */
-  color: #991b1b !important; /* deep high-contrast red text */
-  border: 1px solid #fecaca !important;
-}
-
-.light .hover\:bg-\[\#0c311c\]:hover {
-  background-color: #a7f3d0 !important;
-}
-.light .hover\:bg-\[\#481215\]:hover {
-  background-color: #fecaca !important;
-}
-
-/* SOFT, MODERN ELEVATED STYLE FILES (Clean Premium Aesthetics) */
-.border,
-.border-b,
-.border-t,
-.border-l,
-.border-r,
-[class*="border-cat-"],
-[class*="border-gray-"],
-[class*="border-slate-"] {
-  border-color: rgba(0, 0, 0, 0.08) !important;
-  border-width: 1px !important;
-}
-
-body:not(.light) .border,
-body:not(.light) .border-b,
-body:not(.light) .border-t,
-body:not(.light) .border-l,
-body:not(.light) .border-r,
-body:not(.light) [class*="border-cat-"] {
-  border-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-/* Keep transparent borders truly invisible */
-.border-transparent,
-[class*="border-transparent"] {
-  border-color: transparent !important;
-  border-width: 0px !important;
-}
-
-/* CLEAN, SOFT POP-OUT CARD FLOW SHADOWS */
-.shadow-xs {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
-}
-.shadow-sm {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
-}
-.shadow, .shadow-md {
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03) !important;
-}
-.shadow-lg, .shadow-xl, .shadow-2xl {
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 16px -6px rgba(0, 0, 0, 0.04) !important;
-}
-
-/* Cozy and aesthetic tactile form elements (Zero-jerk premium design) */
-input:not([class*="bg-transparent"]),
-select,
+/* Standard Minimalist Form Inputs - Sleek, round edges, subtle thin border */
+input:not(.border-0):not(.border-none):not([class*="border-0"]), 
+select, 
 textarea {
-  border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
-  border-radius: 12px !important;
   background-color: #ffffff !important;
-  color: #1a1a18 !important;
-  font-weight: 500 !important;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-/* Dark mode inputs style */
-body:not(.light) input:not([class*="bg-transparent"]),
-body:not(.light) select,
-body:not(.light) textarea {
-  background-color: #1e1e2e !important;
-  color: #cdd6f4 !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.1) !important;
+  color: #09090b !important;
+  border: 1px solid #e4e4e7 !important;
+  border-radius: 10px !important;
+  outline: none !important;
   box-shadow: none !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  transition: all 0.1s ease-in-out !important;
 }
 
-input:not([class*="bg-transparent"]):focus,
-select:focus,
+input:focus:not(.border-0):not(.border-none):not([class*="border-0"]), 
+select:focus, 
 textarea:focus {
-  border-color: var(--color-cat-lavender) !important;
-  box-shadow: 0 0 0 3px rgba(180, 190, 254, 0.18) !important;
+  border-color: #09090b !important;
+  box-shadow: 0 0 0 2px rgba(9, 9, 11, 0.05) !important;
   outline: none !important;
 }
 
-/* Search input specific helper */
-.light .placeholder\:text-cat-surface2::placeholder {
-  color: #828277 !important;
-}
-
-/* Ambient active state under navigation tabs */
-.light .bg-cat-surface0\/20 {
-  background-color: rgba(99, 102, 241, 0.08) !important; /* Soft lavender glow */
-  border-color: rgba(99, 102, 241, 0.25) !important;
-  color: #6366f1 !important;
+/* Rounded Buttons - Minimalist & Borderless */
+button {
+  transition: all 0.1s ease-in-out !important;
+  border: none !important;
+  border-width: 0px !important;
   box-shadow: none !important;
 }
-
-body:not(.light) .bg-cat-surface0\/20 {
-  background-color: rgba(180, 190, 254, 0.1) !important;
-  border-color: rgba(180, 190, 254, 0.2) !important;
-  color: #b4befe !important;
-  box-shadow: none !important;
+button:hover:not(:disabled) {
+  opacity: 0.85;
 }
-
-/* Spring action buttons instead of flat offsets */
-button,
-.nav-item,
-[role="button"] {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-button:hover:not(:disabled),
-[role="button"]:hover {
-  transform: translateY(-0.5px);
-  filter: brightness(1.04);
-}
-
-button:active:not(:disabled),
-[role="button"]:active {
+button:active:not(:disabled) {
   transform: translateY(0.5px);
 }
 
-/* Specific styling for helper action elements */
-.light button.px-2.5.py-1.5.border {
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+/* Beautiful structural borders for minimalist look: thin, light grey, neutral */
+.border,
+.border-t,
+.border-b,
+.border-l,
+.border-r,
+.border-2,
+.border-t-2,
+.border-b-2,
+.border-l-2,
+.border-r-2 {
+  border-color: #f4f4f5 !important;
+}
+
+/* Specific neutral helper colors */
+.border-cat-surface0 {
+  border-color: #e4e4e7 !important;
+}
+.border-cat-surface1 {
+  border-color: #f4f4f5 !important;
+}
+
+/* Flat, clean shadows replacing neo-brutalist blocks */
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+}
+.shadow, .shadow-md {
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.01) !important;
+}
+.shadow-lg, .shadow-2xl, [class*="brut-shadow"] {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 16px -6px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Dividing lines inside lists and tables */
+div[class*="divide-y"] > * {
+  border-color: #f4f4f5 !important;
+}
+div[class*="divide-x"] > * {
+  border-color: #f4f4f5 !important;
+}
+
+/* Keep Charts high-contrast with monochrome grays */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #f4f4f5 !important;
+}
+.recharts-default-tooltip {
   background-color: #ffffff !important;
+  border: 1px solid #e4e4e7 !important;
+  box-sizing: border-box;
+  padding: 8px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
 }
 
-/* Standard readable status tags and accents in Light Mode */
-.light .text-cat-green, .light .text-emerald-400 {
-  color: #15803d !important;
-  font-weight: 600 !important;
+/* Modern, uniform rounded corners across all components */
+.rounded-none,
+.rounded-sm,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl,
+.rounded-3xl,
+[class*="rounded-"] {
+  border-radius: 12px !important;
 }
 
-.light .text-cat-red, .light .text-red-400 {
-  color: #b91c1c !important;
-  font-weight: 600 !important;
-}
-
-.light .bg-cat-green\/10 {
-  background-color: #d1fae5 !important;
-  border: 1px solid rgba(16, 185, 129, 0.15) !important;
-  color: #065f46 !important;
-}
-
-.light .bg-cat-red\/10 {
-  background-color: #fee2e2 !important;
-  border: 1px solid rgba(239, 68, 68, 0.15) !important;
-  color: #991b1b !important;
-}
-
-/* Primary block buttons colored tags in Light Mode */
-.light .bg-cat-green {
-  background-color: #22c55e !important;
-  color: #ffffff !important;
-  border: none !important;
-}
-
-.light .bg-cat-red {
-  background-color: #ef4444 !important;
-  color: #ffffff !important;
-  border: none !important;
-}
-
-.light .bg-cat-peach {
-  background-color: #f97316 !important;
-  color: #ffffff !important;
-  border: none !important;
-}
-
-.light .bg-cat-mauve {
-  background-color: #ec4899 !important;
-  color: #ffffff !important;
-  border: none !important;
-}
-
-/* Custom scrollbar for beautiful Catppuccin theme */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #11111b;
-}
-::-webkit-scrollbar-thumb {
-  background: #313244;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #45475a;
+.rounded-full {
+  border-radius: 9999px !important;
 }

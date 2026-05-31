@@ -68,15 +68,15 @@ export function calculateStatistics(
     runningBal += trade.pnl;
 
     if (trade.pnl > 0.01) {
-      wonTrades++;
-      grossProfit += trade.pnl;
-      if (trade.pnl > bestTrade) bestTrade = trade.pnl;
+       wonTrades++;
+       grossProfit += trade.pnl;
+       if (trade.pnl > bestTrade) bestTrade = trade.pnl;
     } else if (trade.pnl < -0.01) {
-      lostTrades++;
-      grossLoss += Math.abs(trade.pnl);
-      if (trade.pnl < worstTrade) worstTrade = trade.pnl;
+       lostTrades++;
+       grossLoss += Math.abs(trade.pnl);
+       if (trade.pnl < worstTrade) worstTrade = trade.pnl;
     } else {
-      breakevenTrades++;
+       breakevenTrades++;
     }
 
     // Tally R-Multiple
@@ -147,27 +147,10 @@ export function formatNumberAbbreviated(value: number, currency: string = 'USD',
     }
   }
 
-  let formattedNum = '';
-  if (absValue >= 1000000) {
-    const valInM = absValue / 1000000;
-    const rounded = Math.round(valInM * 100) / 100;
-    formattedNum = new Intl.NumberFormat('id-ID', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(rounded) + 'M';
-  } else if (absValue >= 1000) {
-    const valInK = absValue / 1000;
-    const rounded = Math.round(valInK * 100) / 100;
-    formattedNum = new Intl.NumberFormat('id-ID', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(rounded) + 'k';
-  } else {
-    formattedNum = new Intl.NumberFormat('id-ID', {
-      minimumFractionDigits: currency === 'IDR' ? 0 : 2,
-      maximumFractionDigits: currency === 'IDR' ? 0 : 2,
-    }).format(absValue);
-  }
+  const formattedNum = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: currency === 'IDR' ? 0 : 2,
+    maximumFractionDigits: currency === 'IDR' ? 0 : 2,
+  }).format(absValue);
 
   return `${isNegative ? '-' : ''}${prefix}${formattedNum}`;
 }
@@ -181,15 +164,13 @@ export function formatPercent(value: number): string {
 }
 
 // Date helpers
-export function formatDateIndonesia(dateStr: string): string {
+export function formatDateEnglish(dateStr: string): string {
   if (!dateStr) return '';
   const date = new Date(dateStr);
-  return new Intl.DateTimeFormat('id-ID', {
+  return new Intl.DateTimeFormat('en-US', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   }).format(date);
 }
 
@@ -281,7 +262,7 @@ export function generateEquityCurveData(
     {
       index: 0,
       tradeId: 'start',
-      date: 'Mulai',
+      date: 'Start',
       pair: 'Starting Balance',
       profit: 0,
       balance: currentBal,
@@ -294,7 +275,7 @@ export function generateEquityCurveData(
     points.push({
       index: i + 1,
       tradeId: trade.id,
-      date: new Date(trade.entryDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+      date: new Date(trade.entryDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
       pair: trade.pair,
       profit: trade.pnl,
       balance: parseFloat(currentBal.toFixed(2)),
@@ -328,7 +309,7 @@ export function generateDailyPnlData(trades: Trade[]): DailyPnlPoint[] {
   return Object.entries(pnlMap)
     .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
     .map(([date, data]) => ({
-      date: new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }),
+      date: new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
       pnl: parseFloat(data.pnl.toFixed(2)),
       tradeCount: data.count,
     }));
@@ -338,23 +319,19 @@ export function generateDailyPnlData(trades: Trade[]): DailyPnlPoint[] {
 export const DEFAULT_TRADING_PAIRS: TradingPair[] = [
   { id: 'p-eurusd', name: 'Euro / US Dollar', alias: 'EURUSD', contractSize: 100000 },
   { id: 'p-gbpusd', name: 'Great British Pound / US Dollar', alias: 'GBPUSD', contractSize: 100000 },
-  { id: 'p-xauusd', name: 'Emas (Gold / USD)', alias: 'XAUUSD', contractSize: 100 },
-  { id: 'p-usdjpy', name: 'US Dollar / Yen Jepang', alias: 'USDJPY', contractSize: 1000 },
-  { id: 'p-gbpjpy', name: 'Pound Inggris / Yen Jepang', alias: 'GBPJPY', contractSize: 1000 },
+  { id: 'p-xauusd', name: 'Gold / US Dollar', alias: 'XAUUSD', contractSize: 100 },
+  { id: 'p-usdjpy', name: 'US Dollar / Japanese Yen', alias: 'USDJPY', contractSize: 1000 },
+  { id: 'p-gbpjpy', name: 'British Pound / Japanese Yen', alias: 'GBPJPY', contractSize: 1000 },
   { id: 'p-btcusd', name: 'Bitcoin / US Dollar', alias: 'BTCUSD', contractSize: 1 },
   { id: 'p-ethusd', name: 'Ethereum / US Dollar', alias: 'ETHUSD', contractSize: 1 },
   { id: 'p-nas100', name: 'Nasdaq 100 Index', alias: 'NAS100', contractSize: 1 },
-  { id: 'p-us30', name: 'Dow Jones (US30)', alias: 'US30', contractSize: 1 }
+  { id: 'p-us30', name: 'Dow Jones Index (US30)', alias: 'US30', contractSize: 1 }
 ];
 
 export const TRADING_PAIRS_LIST = DEFAULT_TRADING_PAIRS.map(p => p.alias);
 
 export const TRADING_STRATEGIES_LIST = [
-  'Order Block SMC', 'Liquidity Grab', 'Fair Value Gap (FVG)', 'Breakout',
+  'Order Block SMC', 'Liquidity Grab', 'Fair Value Gap (FVG)', 'Breakout Check',
   'Support & Resistance (S/R)', 'Trendline Bounce', 'Moving Average Cross',
   'Fibonacci Retracement', 'ICT Killzone', 'Harmonic Pattern'
 ];
-
-
-// Standard exports completed
-

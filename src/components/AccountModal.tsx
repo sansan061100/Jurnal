@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { X, Briefcase, TrendingUp, AlertTriangle } from 'lucide-react';
+import { X, Briefcase } from 'lucide-react';
 import { Account, AccountType } from '../types';
 
 interface AccountModalProps {
@@ -15,10 +15,6 @@ interface AccountModalProps {
     leverage: string;
     description: string;
     type: AccountType;
-    targetProfit?: number;
-    maxTotalLoss?: number;
-    maxDailyLoss?: number;
-    minTradingDays?: number;
   }) => void;
 }
 
@@ -36,10 +32,6 @@ export default function AccountModal({
     leverage: string;
     description: string;
     type: AccountType;
-    targetProfit: number;
-    maxTotalLoss: number;
-    maxDailyLoss: number;
-    minTradingDays: number;
   }>({
     name: '',
     startingBalance: 10000,
@@ -47,11 +39,7 @@ export default function AccountModal({
     broker: '',
     leverage: '1:100',
     description: '',
-    type: 'STANDARD',
-    targetProfit: 1000, // 10% default
-    maxTotalLoss: 1000,  // 10% max total loss default
-    maxDailyLoss: 500,   // 5% max daily loss default
-    minTradingDays: 5
+    type: 'STANDARD'
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -73,11 +61,7 @@ export default function AccountModal({
         broker: editingAccount.broker,
         leverage: editingAccount.leverage,
         description: editingAccount.description || '',
-        type: editingAccount.type || 'STANDARD',
-        targetProfit: editingAccount.targetProfit || Math.round(editingAccount.startingBalance * 0.1),
-        maxTotalLoss: editingAccount.maxTotalLoss || Math.round(editingAccount.startingBalance * 0.1),
-        maxDailyLoss: editingAccount.maxDailyLoss || Math.round(editingAccount.startingBalance * 0.05),
-        minTradingDays: editingAccount.minTradingDays || 5
+        type: editingAccount.type || 'STANDARD'
       });
     } else {
       setForm({
@@ -87,25 +71,10 @@ export default function AccountModal({
         broker: '',
         leverage: '1:100',
         description: '',
-        type: 'STANDARD',
-        targetProfit: 1000,
-        maxTotalLoss: 1000,
-        maxDailyLoss: 500,
-        minTradingDays: 5
+        type: 'STANDARD'
       });
     }
   }, [editingAccount, isOpen]);
-
-  // Dynamic automatic recalculation when balance changes
-  const handleBalanceChange = (bal: number) => {
-    setForm(prev => ({
-      ...prev,
-      startingBalance: bal,
-      targetProfit: Math.round(bal * 0.1),
-      maxTotalLoss: Math.round(bal * 0.1),
-      maxDailyLoss: Math.round(bal * 0.05)
-    }));
-  };
 
   if (!isOpen) return null;
 
@@ -113,24 +82,22 @@ export default function AccountModal({
     e.preventDefault();
     if (isSavingRef.current || isSaving) return;
     if (!form.name.trim()) {
-      alert('Nama akun wajib diisi!');
+      alert('Account name is required!');
       return;
     }
 
     isSavingRef.current = true;
     setIsSaving(true);
     try {
-      const payload = {
+      await onSave({
         name: form.name,
         startingBalance: form.startingBalance,
         currency: form.currency,
         broker: form.broker,
         leverage: form.leverage,
         description: form.description,
-        type: 'STANDARD' as AccountType,
-      };
-
-      await onSave(payload);
+        type: 'STANDARD'
+      });
     } catch (err) {
       console.error(err);
     } finally {
@@ -140,7 +107,7 @@ export default function AccountModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 select-none">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -155,17 +122,17 @@ export default function AccountModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-cat-mantle border border-cat-surface1 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl z-50 flex flex-col"
+        className="bg-cat-mantle border-2 border-cat-surface0 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl z-50 flex flex-col"
       >
-        <div className="px-5 py-4 border-b border-cat-surface0 flex items-center justify-between bg-cat-base/40">
-          <h3 className="text-sm font-black text-cat-text flex items-center gap-1.5 uppercase tracking-wide">
+        <div className="px-5 py-4 flex items-center justify-between border-b-2 border-cat-surface0">
+          <h3 className="text-sm font-black text-cat-text flex items-center gap-1.5 uppercase tracking-wider">
             <Briefcase className="h-4 w-4 text-cat-peach" />
-            {editingAccount ? 'Ubah Informasi Akun' : 'Akun Trading Baru'}
+            {editingAccount ? 'Edit Account Info' : 'New Trading Account'}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-cat-surface0 text-cat-subtext transition/all cursor-pointer"
+            className="p-1 rounded-full hover:bg-cat-surface0 text-cat-subtext transition cursor-pointer border border-transparent"
           >
             <X className="h-4 w-4" />
           </button>
@@ -175,43 +142,43 @@ export default function AccountModal({
           <div className="p-5 space-y-4">
             {/* Account Name */}
             <div>
-              <label className="block text-[10px] font-black text-cat-subtext mb-1 uppercase tracking-wider">
-                Nama Akun Jurnal *
+              <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                Account Name *
               </label>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Contoh: Akun Personal USD, Cent Account USC"
-                className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-3 rounded-xl focus:border-cat-peach focus:outline-none transition-all placeholder:text-cat-surface2 font-bold"
+                placeholder="e.g. Personal USD Account, US Cent Account"
+                className="w-full text-xs p-3 font-bold"
               />
             </div>
 
             {/* Starting Balance and Currency */}
             <div className="grid grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-[10px] font-black text-cat-subtext mb-1 uppercase tracking-wider">
-                  Sistem Saldo Awal *
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Starting Capital *
                 </label>
                 <input
                   type="number"
                   required
                   min="1"
                   value={form.startingBalance}
-                  onChange={e => handleBalanceChange(Number(e.target.value))}
-                  className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-3 rounded-xl focus:border-cat-peach focus:outline-none transition-all font-mono font-bold"
+                  onChange={e => setForm(prev => ({ ...prev, startingBalance: Number(e.target.value) }))}
+                  className="w-full text-xs p-3 font-mono font-black"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-cat-subtext mb-1 uppercase tracking-wider">
-                  Mata Uang
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Currency
                 </label>
                 <select
                   value={form.currency}
                   onChange={e => setForm(prev => ({ ...prev, currency: e.target.value }))}
-                  className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3 py-3 rounded-xl focus:border-cat-peach focus:outline-none transition-all cursor-pointer font-bold animate-none"
+                  className="w-full text-xs p-3 cursor-pointer font-bold animate-none"
                 >
                   <option value="USD">USD ($)</option>
                   <option value="USC">¢ US Cents (Cent Account)</option>
@@ -225,61 +192,61 @@ export default function AccountModal({
             {/* Broker and Leverage */}
             <div className="grid grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-[10px] font-black text-cat-subtext mb-1 uppercase tracking-wider">
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
                   Broker Partner
                 </label>
                 <input
                   type="text"
                   value={form.broker}
                   onChange={e => setForm(prev => ({ ...prev, broker: e.target.value }))}
-                  placeholder="Exness, IC Markets"
-                  className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-3 rounded-xl focus:border-cat-peach focus:outline-none transition-all placeholder:text-cat-surface2 font-bold"
+                  placeholder="e.g. Exness, IC Markets"
+                  className="w-full text-xs p-3 font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-cat-subtext mb-1 uppercase tracking-wider">
-                  Leverage Maks
+                <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                  Max Leverage
                 </label>
                 <input
                   type="text"
                   value={form.leverage}
                   onChange={e => setForm(prev => ({ ...prev, leverage: e.target.value }))}
-                  placeholder="1:100, 1:500"
-                  className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-3 rounded-xl focus:border-cat-peach focus:outline-none transition-all font-mono placeholder:text-cat-surface2 font-bold"
+                  placeholder="e.g. 1:100, 1:500"
+                  className="w-full text-xs p-3 font-mono font-bold"
                 />
               </div>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-[10px] font-black text-cat-subtext mb-1 uppercase tracking-wider">
-                Catatan / Deskripsi Rencana
+              <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                Notes / Trading Plan
               </label>
               <textarea
                 rows={3}
                 value={form.description}
                 onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Tulis trading plan, limit lot harian, atau rule leverage..."
-                className="w-full bg-cat-base border border-cat-surface1 text-cat-text text-xs px-3.5 py-3 rounded-xl focus:border-cat-peach focus:outline-none transition-all placeholder:text-cat-surface2 leading-relaxed"
+                placeholder="Declare daily risk rules, target lot caps or general notes..."
+                className="w-full text-xs p-3 leading-relaxed"
               />
             </div>
           </div>
 
-          <div className="bg-cat-base/60 px-5 py-4 flex items-center justify-end gap-2.5 border-t border-cat-surface0">
+          <div className="bg-cat-base/60 px-5 py-4 flex items-center justify-end gap-2.5 border-t-2 border-cat-surface0">
             <button
               type="button"
               onClick={onClose}
-              className="border border-cat-surface1 hover:bg-cat-surface0 text-cat-subtext hover:text-cat-text font-black px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
+              className="hover:bg-cat-surface0 text-cat-subtext font-black px-4 py-2.5 rounded-xl text-xs cursor-pointer border border-transparent transition"
             >
-              Batal
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="bg-cat-peach hover:bg-cat-yellow text-cat-crust font-black uppercase tracking-wider px-5 py-2.5 rounded-xl text-[10px] transition-all shadow-md shadow-cat-peach/10 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-cat-peach hover:bg-cat-yellow text-cat-base font-black uppercase tracking-widest px-5 py-2.5 rounded-xl text-[10px] border-2 border-cat-surface0 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:shadow-none active:translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSaving ? 'Menyimpan...' : (editingAccount ? 'Ubah Akun' : 'Daftarkan Akun')}
+              {isSaving ? 'Saving...' : (editingAccount ? 'Save Changes' : 'Register Account')}
             </button>
           </div>
         </form>
