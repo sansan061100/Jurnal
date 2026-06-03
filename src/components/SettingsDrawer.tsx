@@ -50,6 +50,31 @@ export default function SettingsDrawer({
     const doc = new jsPDF();
     const currentCurrency = activeAccount.currency || 'USD';
     
+    const getCurrencySymbol = (curr: string) => {
+      switch (curr) {
+        case 'USD': return '$';
+        case 'USC': return '¢';
+        case 'IDR': return 'Rp';
+        case 'EUR': return '€';
+        case 'GBP': return '£';
+        default: return curr || '$';
+      }
+    };
+    
+    const currencySym = getCurrencySymbol(currentCurrency);
+
+    const formatPdfValue = (val: number, round = false) => {
+      const isNegative = val < 0;
+      const absVal = Math.abs(val);
+      const valueToFormat = round ? Math.round(absVal) : absVal;
+      const decimals = currentCurrency === 'IDR' || round ? 0 : 2;
+      const formattedNum = valueToFormat.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+      return `${isNegative ? '-' : ''}${currencySym} ${formattedNum}`;
+    };
+    
     // Page Title
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(22);
@@ -105,7 +130,7 @@ export default function SettingsDrawer({
     doc.setFont('helvetica', 'bold');
     doc.text('Starting Balance:', 14, 78);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${currentCurrency} ${activeAccount.startingBalance.toLocaleString('en-US')}`, 46, 78);
+    doc.text(formatPdfValue(activeAccount.startingBalance), 46, 78);
     
     // Section 2: Performance Summary
     doc.setFont('helvetica', 'bold');
@@ -125,14 +150,14 @@ export default function SettingsDrawer({
       { name: 'Total Trade Count', value: `${stats.totalTrades} operations` },
       { name: 'Wins / Losses / Breakeven', value: `${stats.wonTrades} Wins / ${stats.lostTrades} Losses / ${stats.breakevenTrades} BE` },
       { name: 'Win Rate Percentage', value: `${stats.winRate.toFixed(1)}%` },
-      { name: 'Net Consolidated Profit', value: `${currentCurrency} ${stats.netProfit.toLocaleString('en-US')}` },
-      { name: 'Current Liquid Balance', value: `${currentCurrency} ${stats.currentBalance.toLocaleString('en-US')}` },
+      { name: 'Net Consolidated Profit', value: formatPdfValue(stats.netProfit) },
+      { name: 'Current Liquid Balance', value: formatPdfValue(stats.currentBalance) },
       { name: 'Profit Factor Index', value: stats.profitFactor === Infinity ? 'N/A' : (stats.profitFactor || 0).toFixed(2) },
-      { name: 'Average Profit per Win', value: `${currentCurrency} ${Math.round(stats.avgWin || 0).toLocaleString('en-US')}` },
-      { name: 'Average Loss per Defeat', value: `${currentCurrency} ${Math.round(stats.avgLoss || 0).toLocaleString('en-US')}` },
-      { name: 'Best Trade (Profit Peak)', value: `${currentCurrency} ${Math.round(stats.bestTrade || 0).toLocaleString('en-US')}` },
-      { name: 'Worst Trade (Loss Bottom)', value: `${currentCurrency} ${Math.round(stats.worstTrade || 0).toLocaleString('en-US')}` },
-      { name: 'Maximum System Drawdown', value: `${(stats.maxDrawdown || 0).toFixed(2)}% (${currentCurrency} ${Math.round(stats.maxDrawdownVal || 0).toLocaleString('en-US')})` }
+      { name: 'Average Profit per Win', value: formatPdfValue(stats.avgWin || 0, true) },
+      { name: 'Average Loss per Defeat', value: formatPdfValue(stats.avgLoss || 0, true) },
+      { name: 'Best Trade (Profit Peak)', value: formatPdfValue(stats.bestTrade || 0, true) },
+      { name: 'Worst Trade (Loss Bottom)', value: formatPdfValue(stats.worstTrade || 0, true) },
+      { name: 'Maximum System Drawdown', value: `${(stats.maxDrawdown || 0).toFixed(2)}% (${formatPdfValue(stats.maxDrawdownVal || 0, true)})` }
     ];
     
     let currentY = 110;
@@ -145,7 +170,7 @@ export default function SettingsDrawer({
       doc.text(row.name, 16, currentY);
       doc.setFont('helvetica', 'bold');
       
-      if (row.name.includes('Net Profit')) {
+      if (row.name.includes('Net Profit') || row.name.includes('Net Consolidated Profit')) {
         if (stats.netProfit >= 0) {
           doc.setTextColor(46, 125, 50);
         } else {
@@ -171,7 +196,7 @@ export default function SettingsDrawer({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
       doc.setTextColor(30, 30, 46);
-      doc.text('III. RECENT TRANSACTION CHRONICLE', 14, 25);
+      doc.text('III. TRANSACTION HISTORY CHRONICLE', 14, 25);
       
       doc.setFontSize(8);
       doc.setFillColor(242, 243, 245);
@@ -186,7 +211,7 @@ export default function SettingsDrawer({
       let finalY = 43;
       doc.setFont('helvetica', 'normal');
       
-      const sortedTradesForReport = [...activeAccountTrades].sort((a,b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()).slice(0, 25);
+      const sortedTradesForReport = [...activeAccountTrades].sort((a,b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
       
       sortedTradesForReport.forEach((t, idx) => {
         if (idx % 2 === 1) {
@@ -219,10 +244,10 @@ export default function SettingsDrawer({
         doc.setFont('helvetica', 'bold');
         if (t.pnl >= 0) {
           doc.setTextColor(46, 125, 50);
-          doc.text(`+${currentCurrency} ${Math.round(t.pnl).toLocaleString('en-US')}`, 165, finalY);
+          doc.text(`+${formatPdfValue(t.pnl, true)}`, 165, finalY);
         } else {
           doc.setTextColor(198, 40, 40);
-          doc.text(`-${currentCurrency} ${Math.abs(Math.round(t.pnl)).toLocaleString('en-US')}`, 165, finalY);
+          doc.text(`${formatPdfValue(t.pnl, true)}`, 165, finalY);
         }
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(30, 30, 46);
@@ -236,7 +261,7 @@ export default function SettingsDrawer({
           doc.addPage();
           finalY = 25;
           doc.setFont('helvetica', 'bold');
-          doc.text('III. RECENT TRANSACTION CHRONICLE (CONT.)', 14, 15);
+          doc.text('III. TRANSACTION HISTORY CHRONICLE (CONT.)', 14, 15);
           doc.setFontSize(8);
           doc.setFillColor(242, 243, 245);
           doc.rect(14, 18, 182, 8, 'F');

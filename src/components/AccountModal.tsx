@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { X, Briefcase } from 'lucide-react';
 import { Account, AccountType } from '../types';
+import { parseNumericString } from '../utils';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export default function AccountModal({
 }: AccountModalProps) {
   const [form, setForm] = useState<{
     name: string;
-    startingBalance: number;
+    startingBalance: string;
     currency: string;
     broker: string;
     leverage: string;
@@ -34,7 +35,7 @@ export default function AccountModal({
     type: AccountType;
   }>({
     name: '',
-    startingBalance: 10000,
+    startingBalance: '10000',
     currency: 'USD',
     broker: '',
     leverage: '1:100',
@@ -56,7 +57,7 @@ export default function AccountModal({
     if (editingAccount) {
       setForm({
         name: editingAccount.name,
-        startingBalance: editingAccount.startingBalance,
+        startingBalance: String(editingAccount.startingBalance),
         currency: editingAccount.currency,
         broker: editingAccount.broker,
         leverage: editingAccount.leverage,
@@ -66,7 +67,7 @@ export default function AccountModal({
     } else {
       setForm({
         name: '',
-        startingBalance: 10000,
+        startingBalance: '10000',
         currency: 'USD',
         broker: '',
         leverage: '1:100',
@@ -86,12 +87,18 @@ export default function AccountModal({
       return;
     }
 
+    const cleanBalance = parseNumericString(form.startingBalance);
+    if (cleanBalance <= 0) {
+      alert('Starting Capital must be a positive number!');
+      return;
+    }
+
     isSavingRef.current = true;
     setIsSaving(true);
     try {
       await onSave({
         name: form.name,
-        startingBalance: form.startingBalance,
+        startingBalance: cleanBalance,
         currency: form.currency,
         broker: form.broker,
         leverage: form.leverage,
@@ -162,11 +169,11 @@ export default function AccountModal({
                   Starting Capital *
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   required
-                  min="1"
                   value={form.startingBalance}
-                  onChange={e => setForm(prev => ({ ...prev, startingBalance: Number(e.target.value) }))}
+                  onChange={e => setForm(prev => ({ ...prev, startingBalance: e.target.value }))}
                   className="w-full text-xs p-3 font-mono font-black"
                 />
               </div>

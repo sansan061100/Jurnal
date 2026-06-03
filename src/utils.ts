@@ -335,3 +335,47 @@ export const TRADING_STRATEGIES_LIST = [
   'Support & Resistance (S/R)', 'Trendline Bounce', 'Moving Average Cross',
   'Fibonacci Retracement', 'ICT Killzone', 'Harmonic Pattern'
 ];
+
+export function parseNumericString(str: string | number | undefined | null): number {
+  if (str === undefined || str === null) return 0;
+  if (typeof str === 'number') return str;
+  
+  let clean = str.trim();
+  if (!clean) return 0;
+  
+  // Strip currency symbols and letters entirely
+  clean = clean.replace(/[^0-9.,-]/g, '');
+  
+  // If we have both dot and comma
+  if (clean.includes(',') && clean.includes('.')) {
+    const lastComma = clean.lastIndexOf(',');
+    const lastDot = clean.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // European/Indonesian format: 1.234,56 -> remove dots, replace comma with dot
+      clean = clean.replace(/\./g, '').replace(/,/g, '.');
+    } else {
+      // US format: 1,234.56 -> remove commas
+      clean = clean.replace(/,/g, '');
+    }
+  } else if (clean.includes(',')) {
+    // Only commas exist
+    const parts = clean.split(',');
+    if (parts.length === 2 && parts[1].length !== 3) {
+      // e.g. "10,5" or "10000,50" -> decimal comma
+      clean = clean.replace(/,/g, '.');
+    } else {
+      // e.g. "10,000" or "1,000,000" -> thousand separators
+      clean = clean.replace(/,/g, '');
+    }
+  } else if (clean.includes('.')) {
+    // Only dots exist
+    const parts = clean.split('.');
+    if (parts.length > 2) {
+      // e.g. "1.000.000" -> multiple dots are thousand separators
+      clean = clean.replace(/\./g, '');
+    }
+  }
+  
+  const parsed = parseFloat(clean);
+  return isNaN(parsed) ? 0 : parsed;
+}

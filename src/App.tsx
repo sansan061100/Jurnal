@@ -773,6 +773,7 @@ export default function App() {
             activeAccountId={activeAccountId}
             userId={currentUser?.uid || 'local-trader-id'}
             onImportSuccess={handleImportTrades}
+            customPairs={customPairs}
           />
         )}
       </AnimatePresence>

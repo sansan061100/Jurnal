@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { X, Calculator } from 'lucide-react';
 import { Account, Trade, TradeAction, TradeSession, TradingPair } from '../types';
-import { detectTradingSession } from '../utils';
+import { detectTradingSession, parseNumericString } from '../utils';
 
 interface TradeModalProps {
   isOpen: boolean;
@@ -59,12 +59,12 @@ export default function TradeModal({
     accountId: '',
     pair: 'EURUSD',
     action: 'BUY' as TradeAction,
-    lotSize: 0.1,
-    entryPrice: 1.12000,
-    stopLoss: '' as string | number,
-    takeProfit: '' as string | number,
-    exitPrice: 1.12500,
-    pnl: 50.00,
+    lotSize: '',
+    entryPrice: '',
+    stopLoss: '',
+    takeProfit: '',
+    exitPrice: '',
+    pnl: '',
     entryDate: '',
     exitDate: '',
     session: 'London' as TradeSession,
@@ -234,10 +234,10 @@ export default function TradeModal({
             
             return {
               ...prev,
-              entryPrice: price!,
-              exitPrice: price!,
-              stopLoss: newSL,
-              takeProfit: newTP
+              entryPrice: String(price!),
+              exitPrice: String(price!),
+              stopLoss: newSL !== '' ? String(newSL) : '',
+              takeProfit: newTP !== '' ? String(newTP) : ''
             };
           });
         }
@@ -279,21 +279,21 @@ export default function TradeModal({
       setIsManualPnl(isCustomPnl);
 
       setForm({
-        accountId: editingTrade.accountId,
-        pair: editingTrade.pair,
-        action: editingTrade.action,
-        lotSize: editingTrade.lotSize,
-        entryPrice: editingTrade.entryPrice,
-        stopLoss: editingTrade.stopLoss !== undefined ? editingTrade.stopLoss : '',
-        takeProfit: editingTrade.takeProfit !== undefined ? editingTrade.takeProfit : '',
-        exitPrice: editingTrade.exitPrice,
-        pnl: editingTrade.pnl,
-        entryDate: editingTrade.entryDate ? editingTrade.entryDate.substring(0, 10) : '',
-        exitDate: editingTrade.exitDate ? editingTrade.exitDate.substring(0, 10) : '',
-        session: editingTrade.session,
-        notes: editingTrade.notes || '',
-        rrRatio: editingTrade.rrRatio || 0,
-        rMultiple: editingTrade.rMultiple || 0
+          accountId: editingTrade.accountId,
+          pair: editingTrade.pair,
+          action: editingTrade.action,
+          lotSize: String(editingTrade.lotSize),
+          entryPrice: String(editingTrade.entryPrice),
+          stopLoss: editingTrade.stopLoss !== undefined ? String(editingTrade.stopLoss) : '',
+          takeProfit: editingTrade.takeProfit !== undefined ? String(editingTrade.takeProfit) : '',
+          exitPrice: String(editingTrade.exitPrice),
+          pnl: String(editingTrade.pnl),
+          entryDate: editingTrade.entryDate ? editingTrade.entryDate.substring(0, 10) : '',
+          exitDate: editingTrade.exitDate ? editingTrade.exitDate.substring(0, 10) : '',
+          session: editingTrade.session,
+          notes: editingTrade.notes || '',
+          rrRatio: editingTrade.rrRatio || 0,
+          rMultiple: editingTrade.rMultiple || 0
       });
     } else {
       setIsManualPnl(false);
@@ -306,18 +306,18 @@ export default function TradeModal({
         accountId: initialAccountId,
         pair: customPairs[0]?.alias || 'EURUSD',
         action: 'BUY',
-        lotSize: 0.1,
-        entryPrice: 1.12000,
-        stopLoss: 1.11500,
-        takeProfit: 1.13500,
-        exitPrice: 1.12500,
-        pnl: 50.00,
+        lotSize: '',
+        entryPrice: '',
+        stopLoss: '',
+        takeProfit: '',
+        exitPrice: '',
+        pnl: '',
         entryDate: defaultDate,
         exitDate: defaultDate,
         session: 'London',
         notes: '',
-        rrRatio: 3.0,
-        rMultiple: 1.0
+        rrRatio: 0,
+        rMultiple: 0
       });
     }
   }, [editingTrade, activeAccountId, accounts, isOpen, customPairs]);
@@ -329,22 +329,27 @@ export default function TradeModal({
 
     // 1. Calculate P&L
     let calculatedPnl = 0;
+    const lotVal = parseNumericString(form.lotSize);
+    const entryVal = parseNumericString(form.entryPrice);
+    const exitVal = parseNumericString(form.exitPrice);
+
     if (form.action === 'BUY') {
-      calculatedPnl = (form.exitPrice - form.entryPrice) * form.lotSize * contract;
+      calculatedPnl = (exitVal - entryVal) * lotVal * contract;
     } else {
-      calculatedPnl = (form.entryPrice - form.exitPrice) * form.lotSize * contract;
+      calculatedPnl = (entryVal - exitVal) * lotVal * contract;
     }
     calculatedPnl = parseFloat(calculatedPnl.toFixed(2));
 
-    const activePnl = isManualPnl ? Number(form.pnl) || 0 : calculatedPnl;
+    const pnlVal = parseNumericString(form.pnl);
+    const activePnl = isManualPnl ? pnlVal : calculatedPnl;
 
     // 2. Calculate Setup Risk Reward (Target RR)
     let calculatedRr = 0;
-    const numSl = Number(form.stopLoss);
-    const numTp = Number(form.takeProfit);
-    if (form.stopLoss !== '' && form.takeProfit !== '' && !isNaN(numSl) && !isNaN(numTp) && numSl !== form.entryPrice) {
-      const risk = Math.abs(form.entryPrice - numSl);
-      const reward = Math.abs(numTp - form.entryPrice);
+    const numSl = parseNumericString(form.stopLoss);
+    const numTp = parseNumericString(form.takeProfit);
+    if (form.stopLoss !== '' && form.takeProfit !== '' && !isNaN(numSl) && !isNaN(numTp) && numSl !== entryVal) {
+      const risk = Math.abs(entryVal - numSl);
+      const reward = Math.abs(numTp - entryVal);
       if (risk > 0) {
         calculatedRr = parseFloat((reward / risk).toFixed(2));
       }
@@ -352,10 +357,10 @@ export default function TradeModal({
 
     // 3. Calculate Realized R-Multiple
     let calculatedRMultiple = 0;
-    if (form.stopLoss !== '' && !isNaN(numSl) && numSl !== form.entryPrice) {
-      const riskPerUnit = Math.abs(form.entryPrice - numSl);
+    if (form.stopLoss !== '' && !isNaN(numSl) && numSl !== entryVal) {
+      const riskPerUnit = Math.abs(entryVal - numSl);
       if (riskPerUnit > 0) {
-        const riskAmount = riskPerUnit * form.lotSize * contract;
+        const riskAmount = riskPerUnit * lotVal * contract;
         if (riskAmount > 0) {
           calculatedRMultiple = parseFloat((activePnl / riskAmount).toFixed(2));
         }
@@ -363,15 +368,15 @@ export default function TradeModal({
     }
 
     setForm(prev => {
-      const targetPnl = isManualPnl ? prev.pnl : calculatedPnl;
+      const targetPnlStr = isManualPnl ? prev.pnl : String(calculatedPnl);
       if (
-        prev.pnl !== targetPnl ||
+        prev.pnl !== targetPnlStr ||
         prev.rrRatio !== calculatedRr ||
         prev.rMultiple !== calculatedRMultiple
       ) {
         return {
           ...prev,
-          pnl: targetPnl,
+          pnl: targetPnlStr,
           rrRatio: calculatedRr,
           rMultiple: calculatedRMultiple
         };
@@ -406,12 +411,16 @@ export default function TradeModal({
     isSavingRef.current = true;
     setIsSaving(true);
 
-    const slVal = form.stopLoss !== '' ? Number(form.stopLoss) : undefined;
-    const tpVal = form.takeProfit !== '' ? Number(form.takeProfit) : undefined;
+    const slVal = form.stopLoss !== '' ? parseNumericString(form.stopLoss) : undefined;
+    const tpVal = form.takeProfit !== '' ? parseNumericString(form.takeProfit) : undefined;
 
     try {
       await onSave({
         ...form,
+        lotSize: parseNumericString(form.lotSize),
+        entryPrice: parseNumericString(form.entryPrice),
+        exitPrice: parseNumericString(form.exitPrice),
+        pnl: parseNumericString(form.pnl),
         stopLoss: slVal,
         takeProfit: tpVal
       });
@@ -427,10 +436,15 @@ export default function TradeModal({
 
   const selectedPairObj = customPairs.find(p => p.alias === form.pair) || { id: 'fallback', alias: form.pair || 'EURUSD', name: 'Standard Forex', contractSize: 100000 };
   const currentMultiplier = selectedPairObj.contractSize;
-  const unitRisk = form.stopLoss !== '' ? Math.abs(form.entryPrice - Number(form.stopLoss)) : 0;
-  const cashRisk = unitRisk * form.lotSize * currentMultiplier;
-  const unitReward = form.takeProfit !== '' ? Math.abs(Number(form.takeProfit) - form.entryPrice) : 0;
-  const cashReward = unitReward * form.lotSize * currentMultiplier;
+  const entryPriceNum = parseNumericString(form.entryPrice);
+  const lotSizeNum = parseNumericString(form.lotSize);
+  const stopLossNum = form.stopLoss !== '' ? parseNumericString(form.stopLoss) : 0;
+  const takeProfitNum = form.takeProfit !== '' ? parseNumericString(form.takeProfit) : 0;
+
+  const unitRisk = form.stopLoss !== '' ? Math.abs(entryPriceNum - stopLossNum) : 0;
+  const cashRisk = unitRisk * lotSizeNum * currentMultiplier;
+  const unitReward = form.takeProfit !== '' ? Math.abs(takeProfitNum - entryPriceNum) : 0;
+  const cashReward = unitReward * lotSizeNum * currentMultiplier;
   
   const selectedAccount = accounts.find(acc => acc.id === form.accountId) || accounts[0];
   const activeCurrency = selectedAccount?.currency || 'USD';
@@ -552,11 +566,12 @@ export default function TradeModal({
                   Entry Price *
                 </label>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   required
+                  placeholder="e.g. 1.12000"
                   value={form.entryPrice}
-                  onChange={e => setForm(prev => ({ ...prev, entryPrice: Number(e.target.value) }))}
+                  onChange={e => setForm(prev => ({ ...prev, entryPrice: e.target.value }))}
                   className="w-full text-xs p-3 font-mono font-black"
                 />
               </div>
@@ -567,12 +582,12 @@ export default function TradeModal({
                   Lot Size *
                 </label>
                 <input
-                  type="number"
-                  step="any"
-                  min="0.001"
+                  type="text"
+                  inputMode="decimal"
                   required
+                  placeholder="e.g. 0.10"
                   value={form.lotSize}
-                  onChange={e => setForm(prev => ({ ...prev, lotSize: Number(e.target.value) }))}
+                  onChange={e => setForm(prev => ({ ...prev, lotSize: e.target.value }))}
                   className="w-full text-xs p-3 font-mono font-black"
                 />
               </div>
@@ -586,8 +601,8 @@ export default function TradeModal({
                   Stop Loss (SL) *
                 </label>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   required
                   placeholder="Stop loss value"
                   value={form.stopLoss}
@@ -602,8 +617,8 @@ export default function TradeModal({
                   Take Profit (TP) *
                 </label>
                 <input
-                  type="number"
-                  step="any"
+                  type="text"
+                  inputMode="decimal"
                   required
                   placeholder="Take profit target"
                   value={form.takeProfit}
@@ -619,11 +634,12 @@ export default function TradeModal({
                 Exit Price / Close *
               </label>
               <input
-                type="number"
-                step="any"
+                type="text"
+                inputMode="decimal"
                 required
+                placeholder="e.g. 1.12500"
                 value={form.exitPrice}
-                onChange={e => setForm(prev => ({ ...prev, exitPrice: Number(e.target.value) }))}
+                onChange={e => setForm(prev => ({ ...prev, exitPrice: e.target.value }))}
                 className="w-full text-xs p-3 font-mono font-black"
               />
             </div>
@@ -698,13 +714,16 @@ export default function TradeModal({
                           const selectedPair = customPairs.find(p => p.alias === form.pair) || { contractSize: 100000 };
                           const contract = selectedPair.contractSize;
                           let calculatedPnl = 0;
+                          const entryVal = parseNumericString(form.entryPrice);
+                          const exitVal = parseNumericString(form.exitPrice);
+                          const lotVal = parseNumericString(form.lotSize);
                           if (form.action === 'BUY') {
-                            calculatedPnl = (form.exitPrice - form.entryPrice) * form.lotSize * contract;
+                            calculatedPnl = (exitVal - entryVal) * lotVal * contract;
                           } else {
-                            calculatedPnl = (form.entryPrice - form.exitPrice) * form.lotSize * contract;
+                            calculatedPnl = (entryVal - exitVal) * lotVal * contract;
                           }
                           calculatedPnl = parseFloat(calculatedPnl.toFixed(2));
-                          setForm(prev => ({ ...prev, pnl: calculatedPnl }));
+                          setForm(prev => ({ ...prev, pnl: String(calculatedPnl) }));
                         }
                       }}
                       className="h-3.5 w-3.5 rounded bg-cat-base text-cat-lavender cursor-pointer border-2 border-cat-surface0"
@@ -720,19 +739,19 @@ export default function TradeModal({
                     {activeCurrency}
                   </span>
                   <input
-                    type="number"
-                    step="any"
+                    type="text"
+                    inputMode="decimal"
                     value={form.pnl}
                     disabled={!isManualPnl}
                     onChange={(e) => {
-                      const val = parseFloat(e.target.value);
-                      setForm(prev => ({ ...prev, pnl: isNaN(val) ? 0 : val }));
+                      const val = e.target.value;
+                      setForm(prev => ({ ...prev, pnl: val }));
                     }}
                     className={`w-full bg-cat-base text-xs pl-14 pr-16 py-2.5 rounded-xl focus:outline-none font-mono font-black border-2 border-cat-surface0 ${
                       !isManualPnl 
                         ? 'text-cat-subtext/60 cursor-not-allowed opacity-80' 
                         : 'focus:ring-1 focus:ring-cat-lavender'
-                    } ${form.pnl >= 0 ? 'text-cat-green' : 'text-cat-red'}`}
+                    } ${parseNumericString(form.pnl) >= 0 ? 'text-cat-green' : 'text-cat-red'}`}
                     placeholder="0.00"
                   />
                   <span className="absolute right-3 text-[8px] font-black uppercase text-cat-text tracking-wider">
