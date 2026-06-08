@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronLeft, ChevronRight, Edit3, Check, X, Calendar, Target, Award, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { Trade, Account } from '../types';
-import { formatCurrency, formatNumberAbbreviated } from '../utils';
+import { formatCurrency, formatNumberAbbreviated, getTradeStatus } from '../utils';
 
 interface CalendarTabProps {
   accounts: Account[];
@@ -648,7 +648,7 @@ export default function CalendarTab({
                   const yearTrades = activeAccountTrades.filter(t => new Date(t.entryDate).getFullYear() === y);
                   const yearPnl = yearTrades.reduce((sum, t) => sum + t.pnl, 0);
                   const yearWinRate = yearTrades.length > 0 
-                    ? (yearTrades.filter(t => t.pnl >= 0.01).length / yearTrades.length) * 100 
+                    ? (yearTrades.filter(t => getTradeStatus(t) === 'WIN').length / yearTrades.length) * 100 
                     : 0;
 
                   return (
@@ -776,7 +776,7 @@ export default function CalendarTab({
                   }
                   sessionMap[s].count += 1;
                   sessionMap[s].pnl += t.pnl;
-                  if (t.pnl > 0.01) {
+                  if (getTradeStatus(t) === 'WIN') {
                     sessionMap[s].won += 1;
                   }
                 });

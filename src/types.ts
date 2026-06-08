@@ -52,6 +52,7 @@ export interface Trade {
   notes: string;
   rrRatio?: number;    // Setup planned risk-reward
   rMultiple?: number;  // Realized R multiple
+  disciplineRating?: 'MATCH' | 'PATIENT' | 'FOMO' | 'REVENGE' | 'OVERLEVERAGE';
 }
 
 export interface BalanceTransaction {

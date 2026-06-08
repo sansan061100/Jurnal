@@ -28,6 +28,7 @@ interface TradeModalProps {
     notes: string;
     rrRatio?: number;
     rMultiple?: number;
+    disciplineRating?: 'MATCH' | 'PATIENT' | 'FOMO' | 'REVENGE' | 'OVERLEVERAGE';
   }) => void;
 }
 
@@ -70,7 +71,8 @@ export default function TradeModal({
     session: 'London' as TradeSession,
     notes: '',
     rrRatio: 0,
-    rMultiple: 0
+    rMultiple: 0,
+    disciplineRating: 'MATCH' as 'MATCH' | 'PATIENT' | 'FOMO' | 'REVENGE' | 'OVERLEVERAGE'
   });
 
   // Fetch live price when pair changes or manual trigger
@@ -293,7 +295,8 @@ export default function TradeModal({
           session: editingTrade.session,
           notes: editingTrade.notes || '',
           rrRatio: editingTrade.rrRatio || 0,
-          rMultiple: editingTrade.rMultiple || 0
+          rMultiple: editingTrade.rMultiple || 0,
+          disciplineRating: editingTrade.disciplineRating || 'MATCH'
       });
     } else {
       setIsManualPnl(false);
@@ -317,7 +320,8 @@ export default function TradeModal({
         session: 'London',
         notes: '',
         rrRatio: 0,
-        rMultiple: 0
+        rMultiple: 0,
+        disciplineRating: 'MATCH'
       });
     }
   }, [editingTrade, activeAccountId, accounts, isOpen, customPairs]);
@@ -747,11 +751,12 @@ export default function TradeModal({
                       const val = e.target.value;
                       setForm(prev => ({ ...prev, pnl: val }));
                     }}
-                    className={`w-full bg-cat-base text-xs pl-14 pr-16 py-2.5 rounded-xl focus:outline-none font-mono font-black border-2 border-cat-surface0 ${
+                    className={`w-full bg-cat-base text-xs py-2.5 rounded-xl focus:outline-none font-mono font-black border-2 border-cat-surface0 ${
                       !isManualPnl 
                         ? 'text-cat-subtext/60 cursor-not-allowed opacity-80' 
                         : 'focus:ring-1 focus:ring-cat-lavender'
                     } ${parseNumericString(form.pnl) >= 0 ? 'text-cat-green' : 'text-cat-red'}`}
+                    style={{ paddingLeft: '3.5rem', paddingRight: '4rem' }}
                     placeholder="0.00"
                   />
                   <span className="absolute right-3 text-[8px] font-black uppercase text-cat-text tracking-wider">
@@ -792,6 +797,39 @@ export default function TradeModal({
                   <option value="New York">🇺🇸 New York Session</option>
                   <option value="Other">🌍 Other / Weekend</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Discipline & Psychology Rating (Gamified) */}
+            <div className="bg-cat-base/30 border-2 border-cat-surface0 p-3 rounded-2xl space-y-2">
+              <label className="block text-[9px] font-black text-cat-lavender uppercase tracking-widest text-left">
+                🎯 DISIPLIN & PSIKOLOGI ENTRI (JOURNAL BADGE)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                {[
+                  { key: 'MATCH', emoji: '🎯', title: 'Plan Aligned', color: 'text-cat-green bg-cat-green/10 border-cat-green', hover: 'hover:border-cat-green/60 hover:text-cat-green' },
+                  { key: 'PATIENT', emoji: '🐢', title: 'Patient Entry', color: 'text-cat-teal bg-cat-teal/10 border-cat-teal', hover: 'hover:border-cat-teal/60 hover:text-cat-teal' },
+                  { key: 'FOMO', emoji: '😡', title: 'FOMO Chase', color: 'text-cat-yellow bg-cat-yellow/10 border-cat-yellow', hover: 'hover:border-cat-yellow/60 hover:text-cat-yellow' },
+                  { key: 'REVENGE', emoji: '🤯', title: 'Revenge Trade', color: 'text-cat-red bg-cat-red/10 border-[#e05f65]', hover: 'hover:border-[#e05f65]/60 hover:text-cat-red' },
+                  { key: 'OVERLEVERAGE', emoji: '🐘', title: 'Big Lot / Risk', color: 'text-cat-peach bg-cat-peach/10 border-cat-peach', hover: 'hover:border-cat-peach/60 hover:text-cat-peach' },
+                ].map(item => {
+                  const isSelected = form.disciplineRating === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, disciplineRating: item.key as any }))}
+                      className={`py-2 px-1 rounded-xl border-2 flex flex-col items-center justify-center text-center transition cursor-pointer select-none focus:outline-none ${
+                        isSelected 
+                          ? `${item.color} scale-[1.03] shadow-inner` 
+                          : 'border-cat-surface0 bg-cat-mantle text-cat-subtext hover:bg-cat-surface0/50 ' + item.hover
+                      }`}
+                    >
+                      <span className="text-base mb-1">{item.emoji}</span>
+                      <span className="text-[8px] font-black uppercase tracking-tight leading-tight block">{item.title}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

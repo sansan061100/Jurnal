@@ -72,15 +72,19 @@ body {
 input:not(.border-0):not(.border-none):not([class*="border-0"]), 
 select, 
 textarea {
-  background-color: #ffffff !important;
-  color: #09090b !important;
-  border: 1px solid #e4e4e7 !important;
-  border-radius: 10px !important;
-  outline: none !important;
-  box-shadow: none !important;
-  font-size: 13px !important;
-  padding: 8px 12px !important;
-  transition: all 0.1s ease-in-out !important;
+  background-color: #ffffff;
+  color: #09090b;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  outline: none;
+  box-shadow: none;
+  font-size: 13px;
+  transition: all 0.1s ease-in-out;
+}
+
+/* Base input paddings with lowest specificity (0-0-1) to allow class utility overrides like pl-14/pr-16 */
+input, select, textarea {
+  padding: 8px 12px;
 }
 
 input:focus:not(.border-0):not(.border-none):not([class*="border-0"]), 
@@ -94,9 +98,9 @@ textarea:focus {
 /* Rounded Buttons - Minimalist & Borderless */
 button {
   transition: all 0.1s ease-in-out !important;
-  border: none !important;
-  border-width: 0px !important;
-  box-shadow: none !important;
+  border: none;
+  border-width: 0px;
+  box-shadow: none;
 }
 button:hover:not(:disabled) {
   opacity: 0.85;

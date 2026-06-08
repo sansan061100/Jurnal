@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, Filter, ChevronLeft, ChevronRight, Edit3, Trash2, HelpCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Account, Trade, TradingPair } from '../types';
-import { formatCurrency, formatDateEnglish } from '../utils';
+import { formatCurrency, formatDateEnglish, getTradeStatus } from '../utils';
 
 interface TradesTabProps {
   accounts: Account[];
@@ -21,7 +21,29 @@ interface TradesTabProps {
   customPairs: TradingPair[];
   onEditTrade: (trade: Trade) => void;
   onDeleteTrade: (id: string) => void;
+  
+  // UI/UX additions
+  filteredTrades: Trade[];
+  activeAccountTradesCount: number;
 }
+
+const getDisciplineDetails = (rating: string | undefined) => {
+  switch (rating) {
+    case 'MATCH':
+      return { emoji: '🎯', label: 'Aligned Plan', color: 'text-cat-green bg-cat-green/10 border-cat-green/20' };
+    case 'PATIENT':
+      return { emoji: '🐢', label: 'Patient Entry', color: 'text-cat-teal bg-cat-teal/10 border-cat-teal/20' };
+    case 'FOMO':
+      return { emoji: '😡', label: 'FOMO Chase', color: 'text-cat-yellow bg-cat-yellow/10 border-cat-yellow/20' };
+    case 'REVENGE':
+      return { emoji: '🤯', label: 'Revenge Trade', color: 'text-cat-red bg-cat-red/10 border-cat-red/20' };
+    case 'OVERLEVERAGE':
+      return { emoji: '🐘', label: 'Big Lot / Risk', color: 'text-cat-peach bg-cat-peach/10 border-cat-peach/20' };
+    default:
+      // Default fallback if existing trade doesn't have rating yet
+      return { emoji: '🎯', label: 'Plan Aligned', color: 'text-cat-green bg-cat-green/10 border-cat-green/20' };
+  }
+};
 
 export default function TradesTab({
   accounts,
@@ -40,7 +62,11 @@ export default function TradesTab({
   paginatedTrades,
   customPairs,
   onEditTrade,
-  onDeleteTrade
+  onDeleteTrade,
+  
+  // UI/UX additions
+  filteredTrades,
+  activeAccountTradesCount
 }: TradesTabProps) {
   const currentAccount = accounts.find(a => a.id === activeAccountId) || accounts[0];
   const currentCurrency = currentAccount?.currency || 'USD';
@@ -62,6 +88,23 @@ export default function TradesTab({
     filterPair !== 'ALL' ||
     filterSession !== 'ALL' ||
     filterOutcome !== 'ALL';
+
+  // UI/UX INSERTION: Live subset analysis on applied searches/filters
+  const filteredStats = useMemo(() => {
+    const total = filteredTrades.length;
+    const wins = filteredTrades.filter(t => getTradeStatus(t) === 'WIN').length;
+    const losses = filteredTrades.filter(t => getTradeStatus(t) === 'LOSS').length;
+    const pnlSum = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const winRate = total > 0 ? (wins / total) * 100 : 0;
+    
+    return {
+      total,
+      wins,
+      losses,
+      pnlSum,
+      winRate
+    };
+  }, [filteredTrades]);
 
   return (
     <div className="space-y-4 pb-6">
@@ -93,6 +136,35 @@ export default function TradesTab({
           {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />}
         </button>
       </div>
+
+      {/* Dynamic Filter Performance Strip (UI/UX Improvement) */}
+      {hasActiveFilters && (
+        <div className="bg-cat-mantle border-2 border-cat-surface0 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🎯</span>
+            <div>
+              <span className="text-[9px] text-cat-subtext font-black uppercase tracking-wider block">Filtered Performance</span>
+              <span className="text-[11px] font-semibold text-cat-text">
+                Showing <strong className="text-cat-lavender">{filteredStats.total}</strong> of <strong className="text-cat-text">{activeAccountTradesCount}</strong> filtered trades
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end border-t border-cat-surface0 pt-2 sm:pt-0">
+            <div className="text-right">
+              <span className="text-[8px] text-cat-subtext font-black uppercase block tracking-wider">Filtered PNL</span>
+              <strong className={`font-mono text-xs block ${filteredStats.pnlSum >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
+                {filteredStats.pnlSum >= 0 ? '+' : ''}{formatCurrency(filteredStats.pnlSum, currentCurrency)}
+              </strong>
+            </div>
+            <div className="text-right pl-3 border-l-2 border-cat-surface0/60">
+              <span className="text-[8px] text-cat-subtext font-black uppercase block tracking-wider">Win Rate</span>
+              <strong className="font-mono text-xs text-cat-lavender block">
+                {filteredStats.winRate.toFixed(1)}% ({filteredStats.wins}W / {filteredStats.losses}L)
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Advanced Filter Collapse Box */}
       {showCollapseFilters && (
@@ -185,9 +257,10 @@ export default function TradesTab({
           </div>
         ) : (
           paginatedTrades.map(trade => {
-            const isProfit = trade.pnl >= 0.01;
-            const isLoss = trade.pnl <= -0.01;
-            const isBE = !isProfit && !isLoss;
+            const status = getTradeStatus(trade);
+            const isProfit = status === 'WIN';
+            const isLoss = status === 'LOSS';
+            const isBE = status === 'BE';
 
             // Target Setup Risk reward layout
             const setupRRValue = trade.rrRatio !== undefined ? trade.rrRatio : 0;
@@ -198,9 +271,9 @@ export default function TradesTab({
                 key={trade.id}
                 className="bg-cat-mantle border-2 border-cat-surface0 rounded-2xl p-4 flex flex-col justify-between hover:border-cat-surface1 transition-all brut-shadow-sm"
               >
-                {/* 1. Header Row (Action, Lot Size, Pair, Date & Net P&L) */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                {/* 1. Header Row (Responsive layout preventing text overlaps) */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cat-surface0/30 pb-2.5 mb-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded leading-none ${
                       trade.action === 'BUY'
                         ? 'bg-cat-green/10 text-cat-green'
@@ -212,17 +285,26 @@ export default function TradesTab({
                     <span className="text-[10px] text-cat-subtext font-mono font-bold">
                       {trade.lotSize.toFixed(2)} Lots
                     </span>
+                    {(() => {
+                      const details = getDisciplineDetails(trade.disciplineRating);
+                      return (
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 border border-cat-surface0/70 leading-none ${details.color}`} title={details.label}>
+                          <span className="text-[10px]">{details.emoji}</span>
+                          <span className="text-[8px] uppercase tracking-wider font-extrabold">{details.label}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Profit Win/Loss Badge & Value */}
-                  <div className="text-right flex items-center gap-2">
-                    <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-2.5 sm:justify-end">
+                    <div className="flex flex-col items-start sm:items-end">
                       <strong className={`font-mono text-sm tracking-tight leading-none ${isProfit ? 'text-cat-green' : isLoss ? 'text-cat-red' : 'text-cat-text'}`}>
                         {isProfit ? '+' : ''}{formatCurrency(trade.pnl, currentCurrency)}
                       </strong>
                     </div>
-                    {/* Win/Loss Status Column */}
-                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded leading-none uppercase ${
+                    {/* Win/Loss Status Badge */}
+                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded leading-none uppercase tracking-wide shrink-0 ${
                       isProfit 
                         ? 'bg-cat-green text-cat-base' 
                         : isLoss 

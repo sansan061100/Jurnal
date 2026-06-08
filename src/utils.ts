@@ -26,6 +26,35 @@ export interface AccountStatistics {
   grossLoss: number;
   totalRMultiple: number;
   avgRMultiple: number;
+
+  // NEW DYNAMIC DETAILED STATS BASED ON USER SCREENSHOTS
+  avgDailyPnl: number;
+  avgTradePnl: number;
+  tradeExpectancy: number;
+  largestProfit: number;
+  largestLoss: number;
+  avgWinTrade: number;
+  avgLossTrade: number;
+  avgWinningDayPnl: number;
+  avgLosingDayPnl: number;
+  bestDayProfit: number;
+  worstDayLoss: number;
+  bestMonthLabel: string;
+  bestMonthValue: number;
+  worstMonthLabel: string;
+  worstMonthValue: number;
+  avgDailyVolume: number;
+  totalVolume: number;
+  totalCommissions: number;
+  totalSwap: number;
+  totalTradingDays: number;
+  winningDays: number;
+  losingDays: number;
+  maxWinStreak: number;
+  maxLossStreak: number;
+  maxWinDayStreak: number;
+  maxLossDayStreak: number;
+  openTrades: number;
 }
 
 export function calculateStatistics(
@@ -67,11 +96,12 @@ export function calculateStatistics(
     netProfit += trade.pnl;
     runningBal += trade.pnl;
 
-    if (trade.pnl > 0.01) {
+    const status = getTradeStatus(trade);
+    if (status === 'WIN') {
        wonTrades++;
        grossProfit += trade.pnl;
        if (trade.pnl > bestTrade) bestTrade = trade.pnl;
-    } else if (trade.pnl < -0.01) {
+    } else if (status === 'LOSS') {
        lostTrades++;
        grossLoss += Math.abs(trade.pnl);
        if (trade.pnl < worstTrade) worstTrade = trade.pnl;
@@ -108,6 +138,129 @@ export function calculateStatistics(
   const avgLoss = lostTrades > 0 ? grossLoss / lostTrades : 0;
   const avgRMultiple = tradesWithR > 0 ? totalRMultiple / tradesWithR : 0;
 
+  // ---------------- NEW STATS COMPUTATIONS ----------------
+
+  // 1. Daily grouped stats
+  const dailyPnlMap: Record<string, number> = {};
+  sortedTrades.forEach(trade => {
+    const dateStr = trade.entryDate ? trade.entryDate.substring(0, 10) : '';
+    if (dateStr) {
+      dailyPnlMap[dateStr] = (dailyPnlMap[dateStr] || 0) + trade.pnl;
+    }
+  });
+
+  const totalTradingDays = Object.keys(dailyPnlMap).length;
+  const winningDays = Object.values(dailyPnlMap).filter(val => val > 0.01).length;
+  const losingDays = Object.values(dailyPnlMap).filter(val => val < -0.01).length;
+
+  const avgDailyPnl = totalTradingDays > 0 ? netProfit / totalTradingDays : 0;
+  const avgTradePnl = totalTrades > 0 ? netProfit / totalTrades : 0;
+
+  // Expectancy calculation: (Win% * AvgWin) - (Loss% * AvgLoss)
+  const winRateFract = totalTrades > 0 ? wonTrades / totalTrades : 0;
+  const lossRateFract = totalTrades > 0 ? lostTrades / totalTrades : 0;
+  const tradeExpectancy = (winRateFract * avgWin) - (lossRateFract * avgLoss);
+
+  const largestProfit = wonTrades > 0 ? bestTrade : 0;
+  const largestLoss = lostTrades > 0 ? worstTrade : 0;
+  const avgWinTrade = avgWin;
+  const avgLossTrade = lostTrades > 0 ? -avgLoss : 0; // negative value
+
+  // Avg PNL on winning vs losing days
+  const winningDayVals = Object.values(dailyPnlMap).filter(val => val > 0.01);
+  const losingDayVals = Object.values(dailyPnlMap).filter(val => val < -0.01);
+  const avgWinningDayPnl = winningDayVals.length > 0 ? winningDayVals.reduce((a, b) => a + b, 0) / winningDayVals.length : 0;
+  const avgLosingDayPnl = losingDayVals.length > 0 ? losingDayVals.reduce((a, b) => a + b, 0) / losingDayVals.length : 0;
+
+  // Best/worst day
+  const dayVals = Object.values(dailyPnlMap);
+  const bestDayProfit = dayVals.length > 0 ? Math.max(0, ...dayVals) : 0;
+  const worstDayLoss = dayVals.length > 0 ? Math.min(0, ...dayVals) : 0;
+
+  // 2. Monthly grouped stats
+  const monthlyPnlMap: Record<string, number> = {};
+  sortedTrades.forEach(trade => {
+    const monthStr = trade.entryDate ? trade.entryDate.substring(0, 7) : ''; // YYYY-MM
+    if (monthStr) {
+      monthlyPnlMap[monthStr] = (monthlyPnlMap[monthStr] || 0) + trade.pnl;
+    }
+  });
+
+  function formatMonthYear(yearMonthStr: string): string {
+    if (!yearMonthStr) return '';
+    const [year, month] = yearMonthStr.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
+
+  let bestMonthLabel = '-';
+  let bestMonthValue = 0;
+  let worstMonthLabel = '-';
+  let worstMonthValue = 0;
+
+  const monthEntries = Object.entries(monthlyPnlMap);
+  if (monthEntries.length > 0) {
+    const sortedByPnl = [...monthEntries].sort((a, b) => b[1] - a[1]);
+    bestMonthLabel = formatMonthYear(sortedByPnl[0][0]);
+    bestMonthValue = sortedByPnl[0][1];
+
+    worstMonthLabel = formatMonthYear(sortedByPnl[sortedByPnl.length - 1][0]);
+    worstMonthValue = sortedByPnl[sortedByPnl.length - 1][1];
+  }
+
+  // Volume & Fees
+  const totalVolume = trades.reduce((sum, t) => sum + (t.lotSize || 0), 0);
+  const avgDailyVolume = totalTradingDays > 0 ? totalVolume / totalTradingDays : 0;
+  
+  // Commission and Swaps (default to 0.00 since we only have direct logs, but extensible in client storage if specified)
+  const totalCommissions = trades.reduce((sum, t) => sum + ((t as any).commission || 0), 0);
+  const totalSwap = trades.reduce((sum, t) => sum + ((t as any).swap || 0), 0);
+
+  // Chronological Streaks calculations
+  let maxWinStreak = 0;
+  let currentWinStreak = 0;
+  let maxLossStreak = 0;
+  let currentLossStreak = 0;
+
+  sortedTrades.forEach(trade => {
+    const status = getTradeStatus(trade);
+    if (status === 'WIN') {
+      currentWinStreak++;
+      if (currentWinStreak > maxWinStreak) maxWinStreak = currentWinStreak;
+      currentLossStreak = 0;
+    } else if (status === 'LOSS') {
+      currentLossStreak++;
+      if (currentLossStreak > maxLossStreak) maxLossStreak = currentLossStreak;
+      currentWinStreak = 0;
+    } else {
+      currentWinStreak = 0;
+      currentLossStreak = 0;
+    }
+  });
+
+  // Day Streaks (Win & Loss streaks based on chronological calendar days)
+  const sortedDatesList = Object.keys(dailyPnlMap).sort((a, b) => a.localeCompare(b));
+  let maxWinDayStreak = 0;
+  let currentWinDayStreak = 0;
+  let maxLossDayStreak = 0;
+  let currentLossDayStreak = 0;
+
+  sortedDatesList.forEach(dateStr => {
+    const dayPnl = dailyPnlMap[dateStr];
+    if (dayPnl > 0.01) {
+      currentWinDayStreak++;
+      if (currentWinDayStreak > maxWinDayStreak) maxWinDayStreak = currentWinDayStreak;
+      currentLossDayStreak = 0;
+    } else if (dayPnl < -0.01) {
+      currentLossDayStreak++;
+      if (currentLossDayStreak > maxLossDayStreak) maxLossDayStreak = currentLossDayStreak;
+      currentWinDayStreak = 0;
+    } else {
+      currentWinDayStreak = 0;
+      currentLossDayStreak = 0;
+    }
+  });
+
   return {
     startingBalance,
     netProfit,
@@ -127,7 +280,36 @@ export function calculateStatistics(
     grossProfit,
     grossLoss,
     totalRMultiple: parseFloat(totalRMultiple.toFixed(2)),
-    avgRMultiple: parseFloat(avgRMultiple.toFixed(2))
+    avgRMultiple: parseFloat(avgRMultiple.toFixed(2)),
+
+    // New variables
+    avgDailyPnl,
+    avgTradePnl,
+    tradeExpectancy,
+    largestProfit,
+    largestLoss,
+    avgWinTrade,
+    avgLossTrade,
+    avgWinningDayPnl,
+    avgLosingDayPnl,
+    bestDayProfit,
+    worstDayLoss,
+    bestMonthLabel,
+    bestMonthValue,
+    worstMonthLabel,
+    worstMonthValue,
+    avgDailyVolume,
+    totalVolume,
+    totalCommissions,
+    totalSwap,
+    totalTradingDays,
+    winningDays,
+    losingDays,
+    maxWinStreak,
+    maxLossStreak,
+    maxWinDayStreak,
+    maxLossDayStreak,
+    openTrades: 0 // always 0 since trades logged in this version are of fully completed entries
   };
 }
 
@@ -378,4 +560,15 @@ export function parseNumericString(str: string | number | undefined | null): num
   
   const parsed = parseFloat(clean);
   return isNaN(parsed) ? 0 : parsed;
+}
+
+export function getTradeStatus(trade: Trade): 'WIN' | 'LOSS' | 'BE' {
+  const hasSL = trade.stopLoss !== undefined && trade.stopLoss !== null && trade.stopLoss !== 0;
+  if (hasSL && trade.rMultiple !== undefined && !isNaN(trade.rMultiple)) {
+    if (Math.abs(trade.rMultiple) < 0.5) {
+      return 'BE';
+    }
+    return trade.pnl > 0.01 ? 'WIN' : trade.pnl < -0.01 ? 'LOSS' : 'BE';
+  }
+  return trade.pnl > 0.01 ? 'WIN' : trade.pnl < -0.01 ? 'LOSS' : 'BE';
 }
