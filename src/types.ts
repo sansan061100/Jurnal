@@ -46,6 +46,8 @@ export interface Trade {
   takeProfit?: number;// TP level
   exitPrice: number;
   pnl: number;        // Positive for profit, negative for loss
+  commission?: number; // Fee deducted from pnl
+  swap?: number;       // Fee/rebate adjusted to pnl
   entryDate: string;  // ISO format or date-time string YYYY-MM-DDTHH:mm
   exitDate: string;
   session: TradeSession;

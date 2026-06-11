@@ -370,6 +370,8 @@ export default function App() {
         entryPrice: form.entryPrice,
         exitPrice: form.exitPrice,
         pnl: form.pnl,
+        commission: form.commission,
+        swap: form.swap,
         entryDate: form.entryDate,
         exitDate: form.exitDate,
         session: form.session,

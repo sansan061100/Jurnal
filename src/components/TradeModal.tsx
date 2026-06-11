@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { X, Calculator } from 'lucide-react';
+import { X, Calculator, ArrowLeft } from 'lucide-react';
 import { Account, Trade, TradeAction, TradeSession, TradingPair } from '../types';
 import { detectTradingSession, parseNumericString } from '../utils';
 
@@ -22,6 +22,8 @@ interface TradeModalProps {
     takeProfit?: number;
     exitPrice: number;
     pnl: number;
+    commission?: number;
+    swap?: number;
     entryDate: string;
     exitDate: string;
     session: TradeSession;
@@ -66,12 +68,14 @@ export default function TradeModal({
     takeProfit: '',
     exitPrice: '',
     pnl: '',
+    commission: '',
+    swap: '',
     entryDate: '',
     exitDate: '',
     session: 'London' as TradeSession,
     notes: '',
-    rrRatio: 0,
-    rMultiple: 0,
+    rrRatio: undefined as number | undefined,
+    rMultiple: undefined as number | undefined,
     disciplineRating: 'MATCH' as 'MATCH' | 'PATIENT' | 'FOMO' | 'REVENGE' | 'OVERLEVERAGE'
   });
 
@@ -290,17 +294,19 @@ export default function TradeModal({
           takeProfit: editingTrade.takeProfit !== undefined ? String(editingTrade.takeProfit) : '',
           exitPrice: String(editingTrade.exitPrice),
           pnl: String(editingTrade.pnl),
+          commission: editingTrade.commission !== undefined ? String(editingTrade.commission) : '',
+          swap: editingTrade.swap !== undefined ? String(editingTrade.swap) : '',
           entryDate: editingTrade.entryDate ? editingTrade.entryDate.substring(0, 10) : '',
           exitDate: editingTrade.exitDate ? editingTrade.exitDate.substring(0, 10) : '',
           session: editingTrade.session,
           notes: editingTrade.notes || '',
-          rrRatio: editingTrade.rrRatio || 0,
-          rMultiple: editingTrade.rMultiple || 0,
+          rrRatio: editingTrade.rrRatio,
+          rMultiple: editingTrade.rMultiple,
           disciplineRating: editingTrade.disciplineRating || 'MATCH'
       });
     } else {
       setIsManualPnl(false);
-      const defaultDate = '2026-05-21';
+      const defaultDate = new Date().toLocaleDateString('en-CA');
       const initialAccountId = activeAccountId && activeAccountId !== 'all_accounts' 
         ? activeAccountId 
         : (accounts[0]?.id || '');
@@ -315,12 +321,14 @@ export default function TradeModal({
         takeProfit: '',
         exitPrice: '',
         pnl: '',
+        commission: '',
+        swap: '',
         entryDate: defaultDate,
         exitDate: defaultDate,
         session: 'London',
         notes: '',
-        rrRatio: 0,
-        rMultiple: 0,
+        rrRatio: undefined,
+        rMultiple: undefined,
         disciplineRating: 'MATCH'
       });
     }
@@ -348,7 +356,7 @@ export default function TradeModal({
     const activePnl = isManualPnl ? pnlVal : calculatedPnl;
 
     // 2. Calculate Setup Risk Reward (Target RR)
-    let calculatedRr = 0;
+    let calculatedRr: number | undefined = undefined;
     const numSl = parseNumericString(form.stopLoss);
     const numTp = parseNumericString(form.takeProfit);
     if (form.stopLoss !== '' && form.takeProfit !== '' && !isNaN(numSl) && !isNaN(numTp) && numSl !== entryVal) {
@@ -360,7 +368,7 @@ export default function TradeModal({
     }
 
     // 3. Calculate Realized R-Multiple
-    let calculatedRMultiple = 0;
+    let calculatedRMultiple: number | undefined = undefined;
     if (form.stopLoss !== '' && !isNaN(numSl) && numSl !== entryVal) {
       const riskPerUnit = Math.abs(entryVal - numSl);
       if (riskPerUnit > 0) {
@@ -425,6 +433,8 @@ export default function TradeModal({
         entryPrice: parseNumericString(form.entryPrice),
         exitPrice: parseNumericString(form.exitPrice),
         pnl: parseNumericString(form.pnl),
+        commission: form.commission !== '' ? parseNumericString(form.commission) : 0,
+        swap: form.swap !== '' ? parseNumericString(form.swap) : 0,
         stopLoss: slVal,
         takeProfit: tpVal
       });
@@ -454,43 +464,49 @@ export default function TradeModal({
   const activeCurrency = selectedAccount?.currency || 'USD';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 bg-cat-crust/90 backdrop-blur-xs cursor-pointer"
-      />
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+      className="fixed inset-0 z-50 bg-[#fafafa] flex flex-col h-screen w-screen overflow-hidden select-none"
+    >
+      {/* Dynamic Native Navigation Bar */}
+      <div className="bg-white border-b border-zinc-200 px-4 py-4 sm:px-6 flex items-center justify-between z-10 shrink-0">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-1.5 px-3 py-2 -ml-2 rounded-xl text-xs font-bold text-zinc-650 hover:text-zinc-900 hover:bg-zinc-100 transition duration-200 cursor-pointer border border-transparent"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Journal
+        </button>
 
-      {/* Modal Box */}
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-cat-mantle border-2 border-cat-surface0 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-50 flex flex-col max-h-[92vh] select-none"
-      >
-        {/* Header */}
-        <div className="px-6 py-4 flex items-center justify-between border-b-2 border-cat-surface0">
-          <h3 className="text-sm font-black text-cat-text flex items-center gap-2 uppercase tracking-wider">
-            <Calculator className="h-4.5 w-4.5 text-cat-lavender" />
-            {editingTrade ? 'Edit Trade Log' : 'Create Trade Log'}
+        <h2 className="text-xs font-black text-zinc-800 uppercase tracking-widest absolute left-1/2 -translate-x-1/2 pointer-events-none hidden sm:block">
+          {editingTrade ? 'Edit Portfolio Position' : 'Log New Journal Position'}
+        </h2>
+
+        <div className="flex items-center gap-2">
+          <h3 className="text-[10px] font-black text-zinc-400 uppercase tracking-wider bg-zinc-100 px-2.5 py-1 rounded-lg">
+            {editingTrade ? 'Update Mode' : 'New Transaction'}
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-cat-surface0 text-cat-subtext transition-all cursor-pointer border border-transparent"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
+      </div>
 
-        {/* Content Box */}
-        <div className="flex-1 overflow-y-auto p-6 min-h-0">
+      {/* Main Form Body / Layout Envelope */}
+      <div className="flex-1 overflow-y-auto bg-[#fbfbfb] px-4 py-6 sm:px-6 md:py-10">
+        <div className="max-w-2xl mx-auto w-full">
+          
+          {/* Mobile Header Title */}
+          <div className="mb-5 block sm:hidden text-left">
+            <h1 className="text-lg font-black text-zinc-900 tracking-tight uppercase">
+              {editingTrade ? 'Edit Trade Log' : 'Create Trade Log'}
+            </h1>
+            <p className="text-[10px] text-zinc-400 mt-0.5">Please register the parameters to commit this position.</p>
+          </div>
+
           <form
             onSubmit={handleSubmit}
-            className="space-y-4"
+            className="space-y-6 bg-white border border-zinc-200 shadow-none p-6 sm:p-8 rounded-[24px]"
           >
             {/* Account Selector */}
             <div>
@@ -683,9 +699,9 @@ export default function TradeModal({
                 {/* RR Setup Ratio */}
                 <div className="bg-cat-mantle border border-cat-surface0/50 p-2.5 rounded-xl flex items-center justify-between">
                   <div>
-                    <span className="block text-[9px] text-cat-subtext font-black uppercase mb-0.5">EST. RISK RATION (RR)</span>
+                    <span className="block text-[9px] text-cat-subtext font-black uppercase mb-0.5">EST. RISK RATIO (RR)</span>
                     <span className="font-mono text-cat-lavender font-black">
-                      1 : {form.rrRatio.toFixed(2)}
+                      {form.rrRatio !== undefined ? `1 : ${form.rrRatio.toFixed(2)}` : 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -694,9 +710,13 @@ export default function TradeModal({
                 <div className="bg-cat-mantle border border-cat-surface0/50 p-2.5 rounded-xl flex items-center justify-between">
                   <div>
                     <span className="block text-[9px] text-cat-subtext font-black uppercase mb-0.5">REALIZED R VALUE</span>
-                    <span className={`font-mono font-black ${form.rMultiple >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
-                      {form.rMultiple >= 0 ? '+' : ''}{form.rMultiple.toFixed(2)} R
-                    </span>
+                    {form.rMultiple !== undefined ? (
+                      <span className={`font-mono font-black ${form.rMultiple >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
+                        {form.rMultiple >= 0 ? '+' : ''}{form.rMultiple.toFixed(2)} R
+                      </span>
+                    ) : (
+                      <span className="font-mono text-cat-subtext font-bold text-[10px]">N/A (No Stop Loss)</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -762,6 +782,49 @@ export default function TradeModal({
                   <span className="absolute right-3 text-[8px] font-black uppercase text-cat-text tracking-wider">
                     {!isManualPnl ? 'AUTO' : 'MANUAL'}
                   </span>
+                </div>
+              </div>
+
+              {/* Commission and Swap Input Row */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                    Commission ({activeCurrency})
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 font-mono font-black text-[10px] text-cat-subtext">
+                      {activeCurrency}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.commission}
+                      onChange={e => setForm(prev => ({ ...prev, commission: e.target.value }))}
+                      className="w-full bg-cat-base text-xs py-2.5 rounded-xl focus:outline-none font-mono font-black border-2 border-cat-surface0 focus:ring-1 focus:ring-cat-lavender text-cat-text text-left"
+                      style={{ paddingLeft: '3.5rem', paddingRight: '1rem' }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[9px] font-black text-cat-text mb-1 uppercase tracking-widest">
+                    Swap ({activeCurrency})
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 font-mono font-black text-[10px] text-cat-subtext">
+                      {activeCurrency}
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.swap}
+                      onChange={e => setForm(prev => ({ ...prev, swap: e.target.value }))}
+                      className={`w-full bg-cat-base text-xs py-2.5 rounded-xl focus:outline-none font-mono font-black border-2 border-cat-surface0 focus:ring-1 focus:ring-cat-lavender text-left ${parseNumericString(form.swap) >= 0 ? 'text-cat-green' : 'text-cat-red'}`}
+                      style={{ paddingLeft: '3.5rem', paddingRight: '1rem' }}
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -866,8 +929,8 @@ export default function TradeModal({
             </div>
           </form>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </motion.div>
   );
 }
 

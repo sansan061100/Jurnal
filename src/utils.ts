@@ -93,18 +93,19 @@ export function calculateStatistics(
   let maxDrawdownPercent = 0;
 
   for (const trade of sortedTrades) {
-    netProfit += trade.pnl;
-    runningBal += trade.pnl;
+    const netTradePnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
+    netProfit += netTradePnl;
+    runningBal += netTradePnl;
 
     const status = getTradeStatus(trade);
     if (status === 'WIN') {
        wonTrades++;
-       grossProfit += trade.pnl;
-       if (trade.pnl > bestTrade) bestTrade = trade.pnl;
+       grossProfit += netTradePnl;
+       if (netTradePnl > bestTrade) bestTrade = netTradePnl;
     } else if (status === 'LOSS') {
        lostTrades++;
-       grossLoss += Math.abs(trade.pnl);
-       if (trade.pnl < worstTrade) worstTrade = trade.pnl;
+       grossLoss += Math.abs(netTradePnl);
+       if (netTradePnl < worstTrade) worstTrade = netTradePnl;
     } else {
        breakevenTrades++;
     }
@@ -145,7 +146,8 @@ export function calculateStatistics(
   sortedTrades.forEach(trade => {
     const dateStr = trade.entryDate ? trade.entryDate.substring(0, 10) : '';
     if (dateStr) {
-      dailyPnlMap[dateStr] = (dailyPnlMap[dateStr] || 0) + trade.pnl;
+      const netTradePnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
+      dailyPnlMap[dateStr] = (dailyPnlMap[dateStr] || 0) + netTradePnl;
     }
   });
 
@@ -182,7 +184,8 @@ export function calculateStatistics(
   sortedTrades.forEach(trade => {
     const monthStr = trade.entryDate ? trade.entryDate.substring(0, 7) : ''; // YYYY-MM
     if (monthStr) {
-      monthlyPnlMap[monthStr] = (monthlyPnlMap[monthStr] || 0) + trade.pnl;
+      const netTradePnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
+      monthlyPnlMap[monthStr] = (monthlyPnlMap[monthStr] || 0) + netTradePnl;
     }
   });
 
@@ -213,8 +216,8 @@ export function calculateStatistics(
   const avgDailyVolume = totalTradingDays > 0 ? totalVolume / totalTradingDays : 0;
   
   // Commission and Swaps (default to 0.00 since we only have direct logs, but extensible in client storage if specified)
-  const totalCommissions = trades.reduce((sum, t) => sum + ((t as any).commission || 0), 0);
-  const totalSwap = trades.reduce((sum, t) => sum + ((t as any).swap || 0), 0);
+  const totalCommissions = trades.reduce((sum, t) => sum + (t.commission || 0), 0);
+  const totalSwap = trades.reduce((sum, t) => sum + (t.swap || 0), 0);
 
   // Chronological Streaks calculations
   let maxWinStreak = 0;
@@ -391,7 +394,7 @@ export function calculateTradePnLAndMetrics(
   pnl = parseFloat(pnl.toFixed(2));
 
   // 2. Calculate Setup RR Ratio (Target RR)
-  let rrRatio = 0;
+  let rrRatio: number | undefined = undefined;
   if (stopLoss && takeProfit && stopLoss !== entryPrice) {
     const risk = Math.abs(entryPrice - stopLoss);
     const reward = Math.abs(takeProfit - entryPrice);
@@ -401,12 +404,14 @@ export function calculateTradePnLAndMetrics(
   }
 
   // 3. Calculate Realized R-Multiple
-  let rMultiple = 0;
+  let rMultiple: number | undefined = undefined;
   if (stopLoss && stopLoss !== entryPrice) {
     const riskPerUnit = Math.abs(entryPrice - stopLoss);
     if (riskPerUnit > 0) {
       const riskAmount = riskPerUnit * lotSize * contractSize;
-      rMultiple = parseFloat((pnl / riskAmount).toFixed(2));
+      if (riskAmount > 0) {
+        rMultiple = parseFloat((pnl / riskAmount).toFixed(2));
+      }
     }
   }
 
@@ -453,15 +458,16 @@ export function generateEquityCurveData(
   ];
 
   sorted.forEach((trade, i) => {
-    currentBal += trade.pnl;
+    const netTradePnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
+    currentBal += netTradePnl;
     points.push({
       index: i + 1,
       tradeId: trade.id,
       date: new Date(trade.entryDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
       pair: trade.pair,
-      profit: trade.pnl,
+      profit: parseFloat(netTradePnl.toFixed(2)),
       balance: parseFloat(currentBal.toFixed(2)),
-      pnlLabel: `${trade.pnl >= 0 ? '+' : ''}${trade.pnl}`,
+      pnlLabel: `${netTradePnl >= 0 ? '+' : ''}${netTradePnl.toFixed(2)}`,
     });
   });
 
@@ -484,7 +490,8 @@ export function generateDailyPnlData(trades: Trade[]): DailyPnlPoint[] {
     if (!pnlMap[dateStr]) {
       pnlMap[dateStr] = { pnl: 0, count: 0 };
     }
-    pnlMap[dateStr].pnl += trade.pnl;
+    const netTradePnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
+    pnlMap[dateStr].pnl += netTradePnl;
     pnlMap[dateStr].count += 1;
   });
 
@@ -563,12 +570,13 @@ export function parseNumericString(str: string | number | undefined | null): num
 }
 
 export function getTradeStatus(trade: Trade): 'WIN' | 'LOSS' | 'BE' {
+  const netTradePnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
   const hasSL = trade.stopLoss !== undefined && trade.stopLoss !== null && trade.stopLoss !== 0;
   if (hasSL && trade.rMultiple !== undefined && !isNaN(trade.rMultiple)) {
     if (Math.abs(trade.rMultiple) < 0.5) {
       return 'BE';
     }
-    return trade.pnl > 0.01 ? 'WIN' : trade.pnl < -0.01 ? 'LOSS' : 'BE';
+    return netTradePnl > 0.01 ? 'WIN' : netTradePnl < -0.01 ? 'LOSS' : 'BE';
   }
-  return trade.pnl > 0.01 ? 'WIN' : trade.pnl < -0.01 ? 'LOSS' : 'BE';
+  return netTradePnl > 0.01 ? 'WIN' : netTradePnl < -0.01 ? 'LOSS' : 'BE';
 }

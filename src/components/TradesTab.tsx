@@ -94,7 +94,7 @@ export default function TradesTab({
     const total = filteredTrades.length;
     const wins = filteredTrades.filter(t => getTradeStatus(t) === 'WIN').length;
     const losses = filteredTrades.filter(t => getTradeStatus(t) === 'LOSS').length;
-    const pnlSum = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const pnlSum = filteredTrades.reduce((sum, t) => sum + t.pnl - (t.commission || 0) + (t.swap || 0), 0);
     const winRate = total > 0 ? (wins / total) * 100 : 0;
     
     return {
@@ -262,9 +262,11 @@ export default function TradesTab({
             const isLoss = status === 'LOSS';
             const isBE = status === 'BE';
 
+            const netPnl = trade.pnl - (trade.commission || 0) + (trade.swap || 0);
+
             // Target Setup Risk reward layout
-            const setupRRValue = trade.rrRatio !== undefined ? trade.rrRatio : 0;
-            const realizedRMultiple = trade.rMultiple !== undefined ? trade.rMultiple : 0;
+            const setupRRValue = trade.rrRatio;
+            const realizedRMultiple = trade.rMultiple;
 
             return (
               <div
@@ -299,8 +301,8 @@ export default function TradesTab({
                   {/* Profit Win/Loss Badge & Value */}
                   <div className="flex items-center gap-2.5 sm:justify-end">
                     <div className="flex flex-col items-start sm:items-end">
-                      <strong className={`font-mono text-sm tracking-tight leading-none ${isProfit ? 'text-cat-green' : isLoss ? 'text-cat-red' : 'text-cat-text'}`}>
-                        {isProfit ? '+' : ''}{formatCurrency(trade.pnl, currentCurrency)}
+                      <strong className={`font-mono text-sm tracking-tight leading-none ${isProfit ? 'text-cat-green' : isLoss ? 'text-cat-red' : 'text-cat-text'}`} title="Net Profit/Loss (including Commission & Swap)">
+                        {isProfit ? '+' : ''}{formatCurrency(netPnl, currentCurrency)}
                       </strong>
                     </div>
                     {/* Win/Loss Status Badge */}
@@ -341,22 +343,50 @@ export default function TradesTab({
                   </div>
                 </div>
 
+                {/* 2.5 Commission & Swap display */}
+                <div className="grid grid-cols-3 gap-2 mt-2 px-2 py-1 text-[9px] font-mono text-cat-subtext border-t border-b border-cat-surface0/30 select-none">
+                  <div className="flex justify-between items-center pr-2">
+                    <span className="text-[8px] text-cat-subtext uppercase font-bold tracking-wider">Gross PNL:</span>
+                    <span className={`font-bold ${trade.pnl >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
+                      {trade.pnl >= 0 ? '+' : ''}{formatCurrency(trade.pnl, currentCurrency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center px-2 border-l border-r border-cat-surface0/30">
+                    <span className="text-[8px] text-cat-subtext uppercase font-bold tracking-wider">Comm:</span>
+                    <span className="font-bold text-cat-red">
+                      -{formatCurrency(trade.commission || 0, currentCurrency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pl-2">
+                    <span className="text-[8px] text-cat-subtext uppercase font-bold tracking-wider">Swap:</span>
+                    <span className={`font-bold ${trade.swap !== undefined ? (trade.swap >= 0 ? 'text-cat-green' : 'text-cat-red') : 'text-cat-text'}`}>
+                      {trade.swap !== undefined 
+                        ? `${trade.swap >= 0 ? '+' : ''}${formatCurrency(trade.swap, currentCurrency)}`
+                        : `${formatCurrency(0, currentCurrency)}`}
+                    </span>
+                  </div>
+                </div>
+
                 {/* 3. Risk Management Info: Planned R-to-R and Realized R-Multiple */}
                 <div className="flex items-center justify-between text-[11px] font-medium mt-3 bg-cat-base border border-cat-surface0 p-2 rounded-xl">
                   {/* Setup RR */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 align-middle">
                     <span className="text-[9px] text-cat-subtext uppercase font-black tracking-wide">Setup RR:</span>
                     <span className="font-mono text-cat-lavender font-black">
-                      {setupRRValue > 0 ? `1 : ${setupRRValue.toFixed(2)}` : 'N/A'}
+                      {setupRRValue !== undefined && setupRRValue > 0 ? `1 : ${setupRRValue.toFixed(2)}` : 'N/A'}
                     </span>
                   </div>
 
                   {/* Realized R Multiple */}
-                  <div className="flex items-center gap-1.5 border-l-2 border-cat-surface0 pl-3">
+                  <div className="flex items-center gap-1.5 border-l-2 border-cat-surface0 pl-3 align-middle">
                     <span className="text-[9px] text-cat-subtext uppercase font-black tracking-wide">Realized R:</span>
-                    <span className={`font-mono font-black ${realizedRMultiple >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
-                      {realizedRMultiple >= 0 ? '+' : ''}{realizedRMultiple.toFixed(2)} R
-                    </span>
+                    {realizedRMultiple !== undefined ? (
+                      <span className={`font-mono font-black ${realizedRMultiple >= 0 ? 'text-cat-green' : 'text-cat-red'}`}>
+                        {realizedRMultiple >= 0 ? '+' : ''}{realizedRMultiple.toFixed(2)} R
+                      </span>
+                    ) : (
+                      <span className="font-mono text-cat-subtext font-bold text-[10px]">N/A</span>
+                    )}
                   </div>
 
                   {/* Session Indicator */}
