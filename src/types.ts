@@ -66,3 +66,25 @@ export interface BalanceTransaction {
   date: string; // ISO format string
   notes: string;
 }
+
+export interface MonthlyProgress {
+  monthIndex: number; // 1 to 12
+  actualBalance?: number;
+  actualWithdrawn?: number;
+}
+
+export interface Challenge {
+  id: string;
+  userId: string;
+  title: string;
+  startBalance: number;
+  targetBalance: number;
+  durationMonths: number; // up to 12
+  withdrawalRate: number; // percentage (e.g., 20 means 20% of monthly profit is withdrawn)
+  startDate: string;       // YYYY-MM-DD
+  accountId?: string;     // linked portfolio/account Id
+  monthlyProgress: MonthlyProgress[];
+  createdAt: string;
+  isActive: boolean;
+}
+

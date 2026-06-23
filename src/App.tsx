@@ -16,7 +16,8 @@ import {
   Award,
   LogOut,
   ArrowRight,
-  Calculator
+  Calculator,
+  Trophy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -45,6 +46,7 @@ import OverviewTab from './components/OverviewTab';
 import CalendarTab from './components/CalendarTab';
 import TradesTab from './components/TradesTab';
 import CalculatorTab from './components/CalculatorTab';
+import ChallengesTab from './components/ChallengesTab';
 import ConfirmModal from './components/ConfirmModal';
 import ImportModal from './components/ImportModal';
 
@@ -71,7 +73,7 @@ export default function App() {
   const [balanceTransactions, setBalanceTransactions] = useState<BalanceTransaction[]>([]);
   const [customPairs, setCustomPairs] = useState<TradingPair[]>(DEFAULT_TRADING_PAIRS);
   const [activeAccountId, setActiveAccountId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'calendar' | 'calculator'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'calendar' | 'calculator' | 'challenges'>('overview');
 
   // Force Minimalism Light Theme on load
   useEffect(() => {
@@ -664,6 +666,16 @@ export default function App() {
                   customPairs={customPairs}
                 />
               )}
+
+              {activeTab === 'challenges' && (
+                <ChallengesTab
+                  accounts={accounts}
+                  activeAccountId={activeAccountId}
+                  trades={trades}
+                  balanceTransactions={balanceTransactions}
+                  onShowToast={showToast}
+                />
+              )}
             </>
           )}
         </main>
@@ -671,7 +683,7 @@ export default function App() {
         {/* Sleek Fixed Bottom Tab Navigation */}
         {accounts.length > 0 && (
           <nav className="bg-white border-t border-zinc-100/80 z-40 select-none shrink-0 w-full">
-            <div className="max-w-md mx-auto grid grid-cols-4 gap-1 py-1.5 px-2">
+            <div className="max-w-md mx-auto grid grid-cols-5 gap-0.5 py-1.5 px-2">
               {/* Overview Tab Button */}
               <button
                 onClick={() => setActiveTab('overview')}
@@ -733,6 +745,20 @@ export default function App() {
               >
                 <Calculator className="h-4 w-4" />
                 <span className="text-[10px] font-semibold">Calculator</span>
+              </button>
+
+              {/* Challenges Tab Button */}
+              <button
+                onClick={() => setActiveTab('challenges')}
+                disabled={accounts.length === 0}
+                className={`flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl transition-all cursor-pointer disabled:opacity-40 select-none ${
+                  activeTab === 'challenges'
+                    ? 'text-zinc-950 bg-zinc-50 font-bold'
+                    : 'text-zinc-400 hover:text-zinc-600 bg-transparent'
+                }`}
+              >
+                <Trophy className="h-4 w-4" />
+                <span className="text-[10px] font-semibold">Challenge</span>
               </button>
             </div>
           </nav>

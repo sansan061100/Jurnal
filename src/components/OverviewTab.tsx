@@ -95,7 +95,7 @@ export default function OverviewTab({
   const [expandedMetricHelp, setExpandedMetricHelp] = useState<string | null>(null);
 
   // Tab selector for the detailed performance console
-  const [consoleTab, setConsoleTab] = useState<'returns' | 'activity' | 'streaks' | 'volume'>('returns');
+  const [consoleTab, setConsoleTab] = useState<'returns' | 'activity' | 'streaks' | 'volume' | 'safety'>('returns');
 
   // Visualization Mode: 'currency' or 'percentage'
   const [visualMode, setVisualMode] = useState<'currency' | 'percentage'>('currency');
@@ -478,6 +478,58 @@ export default function OverviewTab({
     return {
       champion: sortedBest[0] || null,
       challenge: sortedWorst[0] || null,
+    };
+  }, [filteredTradesForStats]);
+
+  // Dynamic Safety & Risk Compliance Auditing stats (Answers questions on SL / TP gaps)
+  const safetyStats = useMemo(() => {
+    const total = filteredTradesForStats.length;
+    if (total === 0) {
+      return {
+        total: 0,
+        bothCount: 0,
+        bothPct: 0,
+        slOnlyCount: 0,
+        slOnlyPct: 0,
+        tpOnlyCount: 0,
+        tpOnlyPct: 0,
+        noneCount: 0,
+        nonePct: 0,
+        complianceRate: 0,
+      };
+    }
+
+    let bothCount = 0;
+    let slOnlyCount = 0;
+    let tpOnlyCount = 0;
+    let noneCount = 0;
+
+    filteredTradesForStats.forEach(t => {
+      const hasSl = t.stopLoss !== undefined && t.stopLoss !== null && t.stopLoss !== 0;
+      const hasTp = t.takeProfit !== undefined && t.takeProfit !== null && t.takeProfit !== 0;
+
+      if (hasSl && hasTp) {
+        bothCount++;
+      } else if (hasSl) {
+        slOnlyCount++;
+      } else if (hasTp) {
+        tpOnlyCount++;
+      } else {
+        noneCount++;
+      }
+    });
+
+    return {
+      total,
+      bothCount,
+      bothPct: parseFloat(((bothCount / total) * 100).toFixed(1)),
+      slOnlyCount,
+      slOnlyPct: parseFloat(((slOnlyCount / total) * 100).toFixed(1)),
+      tpOnlyCount,
+      tpOnlyPct: parseFloat(((tpOnlyCount / total) * 100).toFixed(1)),
+      noneCount,
+      nonePct: parseFloat(((noneCount / total) * 100).toFixed(1)),
+      complianceRate: parseFloat((((bothCount + slOnlyCount) / total) * 100).toFixed(1)),
     };
   }, [filteredTradesForStats]);
 
@@ -1120,6 +1172,7 @@ export default function OverviewTab({
             { id: 'activity', label: '📈 Activity & Volume' },
             { id: 'streaks', label: '⚡ Streaks & Records' },
             { id: 'volume', label: '🕒 Days & Sessions' },
+            { id: 'safety', label: '🛡️ Safety & Compliance' },
           ].map(tb => (
             <button
               key={tb.id}
@@ -1326,6 +1379,78 @@ export default function OverviewTab({
                   <span className="text-cat-green">⚡ {formatValOrPct(computedStats.bestDayProfit)}</span>
                   <span className="text-cat-red">⚠️ {formatValOrPct(computedStats.worstDayLoss, false)}</span>
                 </div>
+              </div>
+            </>
+          )}
+
+          {consoleTab === 'safety' && (
+            <>
+              {/* Compliance Rating Card */}
+              <div className="bg-cat-base border border-cat-surface0 rounded-xl p-3.5 flex flex-col justify-between text-left col-span-2 sm:col-span-3 lg:col-span-4 select-none">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black tracking-tight text-cat-subtext uppercase">SL Protection Compliance</span>
+                  <span className={`text-[8px] font-black px-2.5 py-1 rounded-lg border ${
+                    safetyStats.complianceRate >= 90 ? 'bg-cat-green/10 text-cat-green border-cat-green/20' : safetyStats.complianceRate >= 70 ? 'bg-cat-peach/10 text-cat-peach border-cat-peach/20' : 'bg-cat-red/10 text-cat-red border-cat-red/20'
+                  }`}>
+                    {safetyStats.complianceRate >= 90 ? 'EXCELLENT' : safetyStats.complianceRate >= 70 ? 'WARNING' : 'CRITICAL RISK'}
+                  </span>
+                </div>
+                <div className="mt-3.5 flex items-end justify-between">
+                  <div>
+                    <span className="text-lg font-black font-mono text-cat-text block tracking-tight leading-none">
+                      {safetyStats.complianceRate}%
+                    </span>
+                    <span className="text-[9px] text-cat-subtext mt-1.5 block">
+                      Percentage of closed trades protected by a Stop Loss
+                    </span>
+                  </div>
+                  {/* Slim Bar indicator */}
+                  <div className="w-24 bg-cat-surface0 h-2 rounded-full overflow-hidden shrink-0 hidden sm:block">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        safetyStats.complianceRate >= 90 ? 'bg-cat-green' : safetyStats.complianceRate >= 70 ? 'bg-cat-peach' : 'bg-cat-red'
+                      }`}
+                      style={{ width: `${safetyStats.complianceRate}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Both Active (SL & TP) */}
+              <div className="bg-cat-base border border-cat-surface0 rounded-xl p-3 flex flex-col justify-between text-left min-h-[72px]">
+                <span className="text-[10px] font-black tracking-tight text-cat-subtext uppercase">🛡️ Full Shield (SL + TP)</span>
+                <div className="text-sm font-black font-mono mt-1 text-cat-green">
+                  {safetyStats.bothCount} <span className="text-[10px] text-cat-subtext">({safetyStats.bothPct}%)</span>
+                </div>
+              </div>
+
+              {/* SL Only */}
+              <div className="bg-cat-base border border-cat-surface0 rounded-xl p-3 flex flex-col justify-between text-left min-h-[72px]">
+                <span className="text-[10px] font-black tracking-tight text-cat-subtext uppercase">🩹 Protected (SL Only)</span>
+                <div className="text-sm font-black font-mono mt-1 text-cat-teal">
+                  {safetyStats.slOnlyCount} <span className="text-[10px] text-cat-subtext">({safetyStats.slOnlyPct}%)</span>
+                </div>
+              </div>
+
+              {/* TP Only */}
+              <div className="bg-cat-base border border-cat-surface0 rounded-xl p-3 flex flex-col justify-between text-left min-h-[72px]">
+                <span className="text-[10px] font-black tracking-tight text-cat-subtext uppercase">🎯 Target Only (TP Only)</span>
+                <div className="text-sm font-black font-mono mt-1 text-cat-peach">
+                  {safetyStats.tpOnlyCount} <span className="text-[10px] text-cat-subtext">({safetyStats.tpOnlyPct}%)</span>
+                </div>
+              </div>
+
+              {/* No SL & No TP */}
+              <div className="bg-cat-base border border-cat-surface0 rounded-xl p-3 flex flex-col justify-between text-left min-h-[72px] relative overflow-hidden">
+                <span className="text-[10px] font-black tracking-tight text-cat-red uppercase">⚠️ Uncapped Risk (No SL/TP)</span>
+                <div className="text-sm font-black font-mono mt-1 text-cat-red">
+                  {safetyStats.noneCount} <span className="text-[10px] text-cat-subtext">({safetyStats.nonePct}%)</span>
+                </div>
+                {safetyStats.noneCount > 0 && (
+                  <div className="absolute top-1.5 right-2 inline-flex items-center text-[7px] bg-cat-red/15 text-cat-red px-1.5 py-0.5 rounded font-black uppercase tracking-wider animate-pulse">
+                    Danger
+                  </div>
+                )}
               </div>
             </>
           )}
